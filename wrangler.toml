@@ -26,15 +26,22 @@ FOOTER_TEXT = "曾梦想仗剑走天涯"
 
 # =================================================================
 #  CLOUDFLARE PAGES DEPLOYMENT CONFIGURATION
-#  - This section is used for the "Deploy to Cloudflare" button.
-#  - It uses the "production" environment, which is supported by Pages.
+#  - This is a self-contained environment for the "Deploy" button.
 # =================================================================
 [env.production]
 
 [[env.production.d1_databases]]
 binding = "NAV_DB"
 database_name = "book"
-database_id = "" # This is correct for Pages deployment
+database_id = ""
 
 [[env.production.kv_namespaces]]
-binding = "NAV_AUTH" # The `id` field is intentionally omitted for Pages deployment
+binding = "NAV_AUTH"
+id = ""
+
+[env.production.vars]
+ICON_API = "https://icon.iori.nyc.mn/?domain="
+ENABLE_PUBLIC_SUBMISSION = false
+SITE_NAME = "IORI"
+SITE_DESCRIPTION = "从效率工具到灵感站点,我们亲自挑选、亲手标注,只为帮助你更快找到值得信赖的优质资源。"
+FOOTER_TEXT = "曾梦想仗剑走天涯"
