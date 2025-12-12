@@ -114,7 +114,7 @@
 | ENABLE_PUBLIC_SUBMISSION | `false` |❌| 允许访客添加书签 |
 | SITE_NAME | `灰色轨迹` |❌| 网站名称以及首页显示名称 |
 | SITE_DESCRIPTION | `一个简单易用的书签导航系统` |❌| 首页副标题 |
-| FOOTER_TEXT | `曾梦想仗剑走天涯` |❌| 首页副标题 |
+| FOOTER_TEXT | `曾梦想仗剑走天涯` |❌| 首页页脚 |
 | ICON_API | `https://favicon.im/` |❌| 图标API |
 | AI_REQUEST_DELAY | 1500 |❌| AI一键补全描述时的调用间隔 |
 | DISPLAY_CATEGORY | 无 |❌| 首页默认显示分类，如设置 `常用推荐 `，访问首页就默认显示常用推荐的书签 |
