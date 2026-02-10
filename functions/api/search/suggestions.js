@@ -87,12 +87,41 @@ async function fetchBaiduSuggestions(keyword) {
  */
 async function fetchGoogleSuggestions(keyword) {
   try {
-    // Google Suggest API 需要特殊处理，通常不公开
-    // 这里作为备选方案，返回空列表
-    // 在实际应用中可以使用其他开源 API 或付费服务
-    return [];
+    // 优先尝试 DuckDuckGo API (开放且可靠)
+    return await fetchDuckDuckGoSuggestions(keyword);
   } catch (error) {
     console.error('[Google Suggestions] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * 获取 DuckDuckGo 搜索建议 (作为 Google 的备选)
+ */
+async function fetchDuckDuckGoSuggestions(keyword) {
+  try {
+    const response = await fetch(
+      `https://ac.duckduckgo.com/ac/?q=${encodeURIComponent(keyword)}&type=list`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      }
+    );
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    // DuckDuckGo API 返回 [{value: "...", type: "..."}]
+    if (Array.isArray(data)) {
+      return data
+        .filter(item => item && item.phrase)
+        .slice(0, 8)
+        .map(item => item.phrase);
+    }
+    return [];
+  } catch (error) {
+    console.error('[DuckDuckGo Suggestions] Error:', error);
     return [];
   }
 }

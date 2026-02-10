@@ -1,20 +1,13 @@
 /**
- * 搜索词联想功能
+ * 搜索词联想功能 - 支持多个搜索框
  * 支持本地建议和外部搜索引擎 API 建议
  */
 
 class SearchAutocomplete {
   constructor() {
-    this.searchInputs = document.querySelectorAll('.search-input-target');
-    this.suggestionDropdown = document.getElementById('suggestionDropdown');
-    this.suggestionList = document.getElementById('suggestionList');
-
-    this.currentEngine = localStorage.getItem('search_engine') || 'local';
-    this.debounceTimer = null;
-    this.selectedIndex = -1;
     this.allBookmarks = [];
-    this.suggestions = [];
     this.suggestionCache = new Map();
+    this.currentEngine = localStorage.getItem('search_engine') || 'local';
 
     // 防抖延迟（毫秒）
     this.DEBOUNCE_DELAY = 300;
@@ -23,7 +16,6 @@ class SearchAutocomplete {
     // 建议数量限制
     this.MAX_LOCAL_SUGGESTIONS = 8;
     this.MAX_EXTERNAL_SUGGESTIONS = 5;
-    this.MAX_TOTAL_SUGGESTIONS = 12;
 
     this.init();
   }
@@ -35,11 +27,10 @@ class SearchAutocomplete {
     // 收集所有书签数据
     this.collectAllBookmarks();
 
-    // 监听搜索框输入
-    this.searchInputs.forEach(input => {
-      input.addEventListener('input', e => this.handleInput(e));
-      input.addEventListener('keydown', e => this.handleKeydown(e));
-      input.addEventListener('blur', () => this.handleBlur());
+    // 为每个搜索框初始化
+    const searchWrappers = document.querySelectorAll('.search-input-target-wrapper');
+    searchWrappers.forEach((wrapper, index) => {
+      this.initializeWrapper(wrapper, index);
     });
 
     // 监听搜索引擎切换
@@ -47,19 +38,122 @@ class SearchAutocomplete {
     engineOptions.forEach(option => {
       option.addEventListener('click', () => {
         this.currentEngine = option.dataset.engine;
-        this.hideSuggestions();
+        // 清除所有下拉列表
+        document.querySelectorAll('.suggestion-dropdown').forEach(dropdown => {
+          dropdown.classList.add('hidden');
+        });
       });
     });
 
     // 点击页面其他区域关闭建议
     document.addEventListener('click', e => {
       if (!e.target.closest('.search-input-target-wrapper')) {
-        this.hideSuggestions();
+        document.querySelectorAll('.suggestion-dropdown').forEach(dropdown => {
+          dropdown.classList.add('hidden');
+        });
       }
     });
 
     // 暴露到全局以便 main.js 访问
     window.searchAutocomplete = this;
+  }
+
+  /**
+   * 初始化单个搜索框及其下拉列表
+   */
+  initializeWrapper(wrapper, index) {
+    const input = wrapper.querySelector('.search-input-target');
+    const dropdown = wrapper.querySelector('.suggestion-dropdown');
+    const list = wrapper.querySelector('.suggestion-list');
+
+    if (!input || !dropdown || !list) {
+      console.warn(`[SearchAutocomplete] 搜索框${index}缺少必要元素`);
+      return;
+    }
+
+    // 为每个输入框添加事件监听
+    let debounceTimer = null;
+    let selectedIndex = -1;
+    let suggestions = [];
+
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      const keyword = input.value.trim();
+
+      if (!keyword) {
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        await this.fetchAndRenderSuggestions(
+          keyword,
+          dropdown,
+          list,
+          index
+        );
+      }, this.DEBOUNCE_DELAY);
+    });
+
+    // 键盘导航
+    input.addEventListener('keydown', e => {
+      if (dropdown.classList.contains('hidden')) return;
+
+      const items = list.querySelectorAll('.suggestion-item');
+      if (items.length === 0) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          selectedIndex = (selectedIndex + 1) % items.length;
+          this.selectSuggestionItem(items, selectedIndex);
+          break;
+
+        case 'ArrowUp':
+          e.preventDefault();
+          selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+          this.selectSuggestionItem(items, selectedIndex);
+          break;
+
+        case 'Enter':
+          e.preventDefault();
+          if (selectedIndex >= 0 && items[selectedIndex]) {
+            this.applySuggestionItem(items[selectedIndex], input, dropdown);
+          }
+          break;
+
+        case 'Escape':
+          e.preventDefault();
+          dropdown.classList.add('hidden');
+          break;
+      }
+    });
+
+    // 失焦延迟关闭
+    input.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (!wrapper.contains(document.activeElement)) {
+          dropdown.classList.add('hidden');
+        }
+      }, 100);
+    });
+
+    // 处理建议项的点击和悬停
+    list.addEventListener('mouseenter', e => {
+      const item = e.target.closest('.suggestion-item');
+      if (item) {
+        const items = list.querySelectorAll('.suggestion-item');
+        const index = Array.from(items).indexOf(item);
+        this.selectSuggestionItem(items, index);
+      }
+    }, true);
+
+    list.addEventListener('click', e => {
+      const item = e.target.closest('.suggestion-item');
+      if (item) {
+        this.applySuggestionItem(item, input, dropdown);
+      }
+    });
   }
 
   /**
@@ -77,71 +171,30 @@ class SearchAutocomplete {
   }
 
   /**
-   * 处理输入事件
+   * 获取并渲染建议
    */
-  handleInput(e) {
-    const keyword = e.target.value.trim();
+  async fetchAndRenderSuggestions(keyword, dropdown, list, wrapperIndex) {
+    const suggestions = [];
 
-    // 清除之前的防抖
-    clearTimeout(this.debounceTimer);
+    // 1. 生成本地建议
+    const localSuggestions = this.generateLocalSuggestions(keyword);
+    suggestions.push(...localSuggestions);
 
-    // 如果为空，隐藏建议
-    if (!keyword) {
-      this.hideSuggestions();
-      return;
+    // 2. 获取外部建议（如果当前引擎不是本地）
+    if (this.currentEngine !== 'local') {
+      const externalSuggestions = await this.fetchExternalSuggestions(
+        keyword,
+        this.currentEngine
+      );
+      suggestions.push(...externalSuggestions);
     }
 
-    // 防抖处理
-    this.debounceTimer = setTimeout(() => {
-      this.fetchSuggestions(keyword);
-    }, this.DEBOUNCE_DELAY);
-  }
-
-  /**
-   * 处理失焦事件（延迟关闭以允许点击建议）
-   */
-  handleBlur() {
-    setTimeout(() => {
-      if (
-        !this.suggestionList.contains(document.activeElement) &&
-        !this.searchInputs[0].contains(document.activeElement)
-      ) {
-        this.hideSuggestions();
-      }
-    }, 100);
-  }
-
-  /**
-   * 获取建议（本地 + 外部）
-   */
-  async fetchSuggestions(keyword) {
-    this.suggestions = [];
-    this.selectedIndex = -1;
-
-    try {
-      // 1. 生成本地建议
-      const localSuggestions = this.generateLocalSuggestions(keyword);
-      this.suggestions.push(...localSuggestions);
-
-      // 2. 获取外部建议（如果当前引擎不是本地）
-      if (this.currentEngine !== 'local') {
-        const externalSuggestions = await this.fetchExternalSuggestions(
-          keyword,
-          this.currentEngine
-        );
-        this.suggestions.push(...externalSuggestions);
-      }
-
-      // 显示建议
-      if (this.suggestions.length > 0) {
-        this.renderSuggestions();
-        this.showSuggestions();
-      } else {
-        this.hideSuggestions();
-      }
-    } catch (error) {
-      console.error('[Search Autocomplete] Error:', error);
-      this.hideSuggestions();
+    // 3. 渲染建议
+    if (suggestions.length > 0) {
+      this.renderSuggestions(suggestions, list);
+      dropdown.classList.remove('hidden');
+    } else {
+      dropdown.classList.add('hidden');
     }
   }
 
@@ -157,7 +210,6 @@ class SearchAutocomplete {
     const lowerKeyword = keyword.toLowerCase();
     const scored = [];
 
-    // 遍历所有书签，计算匹配分数
     this.allBookmarks.forEach(site => {
       let score = 0;
       let matchSource = null;
@@ -167,12 +219,12 @@ class SearchAutocomplete {
         score = 100;
         matchSource = 'bookmark';
       }
-      // 前缀匹配书签名称
+      // 前缀匹配
       else if (site.name.toLowerCase().startsWith(lowerKeyword)) {
         score = 80;
         matchSource = 'bookmark';
       }
-      // 包含匹配书签名称
+      // 包含匹配
       else if (site.name.toLowerCase().includes(lowerKeyword)) {
         score = 60;
         matchSource = 'bookmark';
@@ -202,13 +254,10 @@ class SearchAutocomplete {
       }
     });
 
-    // 排序、去重、限制数量
     const seen = new Set();
     scored
       .sort((a, b) => {
-        // 按分数降序排列
         if (b.score !== a.score) return b.score - a.score;
-        // 相同分数时按名称长度（越短越相关）
         return a.name.length - b.name.length;
       })
       .slice(0, this.MAX_LOCAL_SUGGESTIONS)
@@ -284,18 +333,17 @@ class SearchAutocomplete {
   }
 
   /**
-   * 渲染建议下拉列表
+   * 渲染建议列表
    */
-  renderSuggestions() {
-    this.suggestionList.innerHTML = '';
+  renderSuggestions(suggestions, list) {
+    list.innerHTML = '';
 
-    this.suggestions.forEach((suggestion, index) => {
+    suggestions.forEach((suggestion, index) => {
       const li = document.createElement('li');
       li.className = 'suggestion-item';
       li.dataset.index = index;
 
       if (suggestion.type === 'local') {
-        // 本地建议
         li.innerHTML = `
           <div class="suggestion-content local-suggestion">
             <img src="${escapeHTML(suggestion.icon)}" alt="" class="suggestion-icon" onerror="this.style.display='none'">
@@ -309,7 +357,6 @@ class SearchAutocomplete {
           </div>
         `;
       } else {
-        // 外部建议
         li.innerHTML = `
           <div class="suggestion-content external-suggestion">
             <svg class="suggestion-icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -324,47 +371,17 @@ class SearchAutocomplete {
         `;
       }
 
-      // 鼠标悬停
-      li.addEventListener('mouseenter', () => {
-        this.selectSuggestion(index);
-      });
-
-      // 点击选择
-      li.addEventListener('click', () => {
-        this.selectSuggestion(index);
-        this.applySuggestion(suggestion);
-      });
-
-      this.suggestionList.appendChild(li);
+      list.appendChild(li);
     });
-  }
-
-  /**
-   * 显示建议下拉列表
-   */
-  showSuggestions() {
-    this.suggestionDropdown.classList.remove('hidden');
-  }
-
-  /**
-   * 隐藏建议下拉列表
-   */
-  hideSuggestions() {
-    this.suggestionDropdown.classList.add('hidden');
-    this.selectedIndex = -1;
   }
 
   /**
    * 选择建议项
    */
-  selectSuggestion(index) {
-    // 移除旧的活动状态
-    const oldActive = this.suggestionList.querySelector('.suggestion-item.active');
+  selectSuggestionItem(items, index) {
+    const oldActive = document.querySelector('.suggestion-item.active');
     if (oldActive) oldActive.classList.remove('active');
 
-    // 设置新的活动状态
-    this.selectedIndex = index;
-    const items = this.suggestionList.querySelectorAll('.suggestion-item');
     if (items[index]) {
       items[index].classList.add('active');
       items[index].scrollIntoView({ block: 'nearest' });
@@ -374,77 +391,38 @@ class SearchAutocomplete {
   /**
    * 应用选中的建议
    */
-  applySuggestion(suggestion) {
-    // 更新搜索框
-    const keyword = suggestion.text;
-    this.searchInputs.forEach(input => {
-      input.value = keyword;
-    });
+  applySuggestionItem(item, input, dropdown) {
+    const suggestion = {
+      text: item.querySelector('.suggestion-title')?.textContent || '',
+      type: item.querySelector('.suggestion-engine') ? 'external' : 'local'
+    };
+
+    if (!suggestion.text) return;
+
+    input.value = suggestion.text;
 
     if (suggestion.type === 'local') {
-      // 本地搜索：直接过滤
+      // 本地搜索
       if (typeof currentSearchEngine !== 'undefined') {
         currentSearchEngine = 'local';
       }
       if (typeof updateSearchEngineUI === 'function') {
         updateSearchEngineUI('local');
       }
-      this.searchInputs.forEach(input => {
-        input.dispatchEvent(new Event('input'));
-      });
+      input.dispatchEvent(new Event('input'));
     } else {
-      // 外部搜索：切换到该引擎
+      // 外部搜索
+      const engineName = item.querySelector('.suggestion-engine')?.textContent?.split(' ')[0]?.toLowerCase() || 'baidu';
       if (typeof currentSearchEngine !== 'undefined') {
-        currentSearchEngine = suggestion.type;
+        currentSearchEngine = engineName;
       }
-      localStorage.setItem('search_engine', suggestion.type);
+      localStorage.setItem('search_engine', engineName);
       if (typeof updateSearchEngineUI === 'function') {
-        updateSearchEngineUI(suggestion.type);
+        updateSearchEngineUI(engineName);
       }
     }
 
-    this.hideSuggestions();
-  }
-
-  /**
-   * 处理键盘事件
-   */
-  handleKeydown(e) {
-    const itemCount = this.suggestions.length;
-
-    // 如果没有建议或下拉列表隐藏，不处理
-    if (
-      itemCount === 0 ||
-      this.suggestionDropdown.classList.contains('hidden')
-    ) {
-      return;
-    }
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        this.selectedIndex = (this.selectedIndex + 1) % itemCount;
-        this.selectSuggestion(this.selectedIndex);
-        break;
-
-      case 'ArrowUp':
-        e.preventDefault();
-        this.selectedIndex = (this.selectedIndex - 1 + itemCount) % itemCount;
-        this.selectSuggestion(this.selectedIndex);
-        break;
-
-      case 'Enter':
-        e.preventDefault();
-        if (this.selectedIndex >= 0 && this.suggestions[this.selectedIndex]) {
-          this.applySuggestion(this.suggestions[this.selectedIndex]);
-        }
-        break;
-
-      case 'Escape':
-        e.preventDefault();
-        this.hideSuggestions();
-        break;
-    }
+    dropdown.classList.add('hidden');
   }
 
   /**
@@ -470,6 +448,15 @@ class SearchAutocomplete {
       bing: 'Bing'
     };
     return names[engine] || engine;
+  }
+
+  /**
+   * 隐藏所有建议下拉列表
+   */
+  hideSuggestions() {
+    document.querySelectorAll('.suggestion-dropdown').forEach(dropdown => {
+      dropdown.classList.add('hidden');
+    });
   }
 }
 
