@@ -241,13 +241,17 @@ document.addEventListener('DOMContentLoaded', function() {
           localStorage.setItem('search_engine', currentSearchEngine); // Save to storage
           updateSearchEngineUI(currentSearchEngine);
 
+          // 清除搜索框值和下拉列表
+          searchInputs.forEach(input => {
+              input.value = '';
+              input.focus();
+          });
+
           // Clear search suggestions when engine is switched
           if (window.searchAutocomplete) {
               window.searchAutocomplete.hideSuggestions();
+              window.searchAutocomplete.currentEngine = currentSearchEngine;  // 同步状态
           }
-
-          // Focus input after switch
-          searchInputs.forEach(input => input.focus());
       });
   });
   

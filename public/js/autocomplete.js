@@ -24,11 +24,16 @@ class SearchAutocomplete {
    * 初始化事件监听
    */
   init() {
+    console.log('[SearchAutocomplete] 初始化开始');
+
     // 收集所有书签数据
     this.collectAllBookmarks();
+    console.log(`[SearchAutocomplete] 收集到 ${this.allBookmarks.length} 个书签`);
 
     // 为每个搜索框初始化
     const searchWrappers = document.querySelectorAll('.search-input-target-wrapper');
+    console.log(`[SearchAutocomplete] 找到 ${searchWrappers.length} 个搜索框`);
+
     searchWrappers.forEach((wrapper, index) => {
       this.initializeWrapper(wrapper, index);
     });
@@ -67,7 +72,12 @@ class SearchAutocomplete {
     const list = wrapper.querySelector('.suggestion-list');
 
     if (!input || !dropdown || !list) {
-      console.warn(`[SearchAutocomplete] 搜索框${index}缺少必要元素`);
+      console.error(`[SearchAutocomplete] 搜索框${index}缺少必要元素！`, {
+        hasInput: !!input,
+        hasDropdown: !!dropdown,
+        hasList: !!list,
+        wrapperHTML: wrapper?.outerHTML?.substring(0, 200),
+      });
       return;
     }
 
@@ -181,10 +191,12 @@ class SearchAutocomplete {
     suggestions.push(...localSuggestions);
 
     // 2. 获取外部建议（如果当前引擎不是本地）
-    if (this.currentEngine !== 'local') {
+    // 使用全局 currentSearchEngine 变量保持同步
+    const engine = typeof currentSearchEngine !== 'undefined' ? currentSearchEngine : this.currentEngine;
+    if (engine !== 'local') {
       const externalSuggestions = await this.fetchExternalSuggestions(
         keyword,
-        this.currentEngine
+        engine
       );
       suggestions.push(...externalSuggestions);
     }
@@ -473,6 +485,13 @@ function escapeHTML(str) {
 /**
  * 初始化搜索词联想
  */
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[SearchAutocomplete] DOM已加载，开始初始化');
+    new SearchAutocomplete();
+  });
+} else {
+  // 如果脚本在 DOMContentLoaded 之后加载
+  console.log('[SearchAutocomplete] 页面已加载，立即初始化');
   new SearchAutocomplete();
-});
+}
