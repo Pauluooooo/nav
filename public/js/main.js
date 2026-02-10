@@ -240,7 +240,12 @@ document.addEventListener('DOMContentLoaded', function() {
           currentSearchEngine = option.dataset.engine;
           localStorage.setItem('search_engine', currentSearchEngine); // Save to storage
           updateSearchEngineUI(currentSearchEngine);
-          
+
+          // Clear search suggestions when engine is switched
+          if (window.searchAutocomplete) {
+              window.searchAutocomplete.hideSuggestions();
+          }
+
           // Focus input after switch
           searchInputs.forEach(input => input.focus());
       });
