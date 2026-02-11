@@ -858,14 +858,16 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       sites.forEach((site, index) => {
-        const safeName = escapeHTML(site.name || '未命名');
+        const rawName = String(site.name || '未命名');
+        const safeName = escapeHTML(rawName);
         const safeUrl = normalizeUrl(site.url);
         const safeDesc = escapeHTML(site.desc || '暂无描述');
         const safeCatalog = escapeHTML(site.catelog_name || site.catelog || '未分类');
-        const cardInitial = (safeName.charAt(0) || '站').toUpperCase();
+        const cardInitial = escapeHTML((rawName.trim().charAt(0) || '站').toUpperCase());
         
         const logoHtml = site.logo 
-             ? `<img src="${escapeHTML(site.logo)}" alt="${safeName}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700" decoding="async" loading="lazy">`
+             ? `<img src="${escapeHTML(site.logo)}" alt="${safeName}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700" decoding="async" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.classList.remove('hidden');">
+                <div class="hidden w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`
              : `<div class="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`;
         
         const descHtml = hideDesc ? '' : `<p class="mt-2 text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2" title="${safeDesc}">${safeDesc}</p>`;
@@ -1115,11 +1117,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Theme Toggle + Time Auto Mode
   const themeToggleBtn = document.getElementById('themeToggleBtn');
-  const THEME_AUTO_DARK_START = 19;
-  const THEME_AUTO_DARK_END = 7;
+  const themeConfig = window.IORI_LAYOUT_CONFIG || {};
+  const parseThemeHour = (value, fallback) => {
+      const parsed = Number.parseInt(String(value ?? ''), 10);
+      if (Number.isNaN(parsed) || parsed < 0 || parsed > 23) {
+          return fallback;
+      }
+      return parsed;
+  };
+  const DEFAULT_THEME_MODE = String(themeConfig.themeMode || 'auto').toLowerCase() === 'manual' ? 'manual' : 'auto';
+  const THEME_AUTO_DARK_START = parseThemeHour(themeConfig.themeAutoDarkStart, 19);
+  const THEME_AUTO_DARK_END = parseThemeHour(themeConfig.themeAutoDarkEnd, 7);
 
   function getThemeMode() {
-      return localStorage.getItem('theme_mode') || 'auto';
+      const stored = localStorage.getItem('theme_mode');
+      if (stored === 'auto' || stored === 'manual') {
+          return stored;
+      }
+      return DEFAULT_THEME_MODE;
   }
 
   function getAutoTheme() {

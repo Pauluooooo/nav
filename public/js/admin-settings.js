@@ -87,6 +87,9 @@ const initSettings = () => {
   const homeSiteDescriptionInput = document.getElementById('homeSiteDescription');
 
   const searchEngineProviderSelect = document.getElementById('searchEngineProvider');
+  const homeThemeModeSelect = document.getElementById('homeThemeMode');
+  const homeThemeDarkStartHourInput = document.getElementById('homeThemeDarkStartHour');
+  const homeThemeDarkEndHourInput = document.getElementById('homeThemeDarkEndHour');
 
   // Font Options
   const FONT_OPTIONS = [
@@ -338,6 +341,9 @@ const initSettings = () => {
     home_hitokoto_color: '',
     home_search_engine_enabled: false,
     home_search_engine_provider: 'local',
+    home_theme_mode: 'auto',
+    home_theme_auto_dark_start: '19',
+    home_theme_auto_dark_end: '7',
     home_default_category: '',
     home_remember_last_category: false,
     layout_enable_frosted_glass: false,
@@ -374,6 +380,18 @@ const initSettings = () => {
     }
   }
   fetchPublicConfig();
+
+  function normalizeThemeMode(mode) {
+    return String(mode || '').toLowerCase() === 'manual' ? 'manual' : 'auto';
+  }
+
+  function normalizeThemeHour(hour, fallback) {
+    const parsed = Number.parseInt(String(hour ?? ''), 10);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 23) {
+      return String(fallback);
+    }
+    return String(parsed);
+  }
 
   // Color Picker Sync Helper
   function setupColorPicker(textInput, pickerInput) {
@@ -793,6 +811,11 @@ const initSettings = () => {
       : 'local';
     currentSettings.home_search_engine_provider = normalizedSearchProvider;
     currentSettings.home_search_engine_enabled = normalizedSearchProvider !== 'local';
+    currentSettings.home_theme_mode = normalizeThemeMode(homeThemeModeSelect?.value || currentSettings.home_theme_mode);
+    currentSettings.home_theme_auto_dark_start = normalizeThemeHour(homeThemeDarkStartHourInput?.value, 19);
+    currentSettings.home_theme_auto_dark_end = normalizeThemeHour(homeThemeDarkEndHourInput?.value, 7);
+    if (homeThemeDarkStartHourInput) homeThemeDarkStartHourInput.value = currentSettings.home_theme_auto_dark_start;
+    if (homeThemeDarkEndHourInput) homeThemeDarkEndHourInput.value = currentSettings.home_theme_auto_dark_end;
 
     currentSettings.layout_custom_wallpaper = customWallpaperInput.value.trim();
     currentSettings.layout_random_wallpaper = randomWallpaperSwitch.checked;
@@ -972,6 +995,9 @@ const initSettings = () => {
             } else {
                 currentSettings.home_search_engine_provider = 'local';
             }
+            if (serverSettings.home_theme_mode !== undefined) currentSettings.home_theme_mode = normalizeThemeMode(serverSettings.home_theme_mode);
+            if (serverSettings.home_theme_auto_dark_start !== undefined) currentSettings.home_theme_auto_dark_start = normalizeThemeHour(serverSettings.home_theme_auto_dark_start, 19);
+            if (serverSettings.home_theme_auto_dark_end !== undefined) currentSettings.home_theme_auto_dark_end = normalizeThemeHour(serverSettings.home_theme_auto_dark_end, 7);
             
             if (serverSettings.home_default_category) currentSettings.home_default_category = serverSettings.home_default_category;
             if (serverSettings.home_remember_last_category !== undefined) currentSettings.home_remember_last_category = serverSettings.home_remember_last_category === 'true';
@@ -1146,6 +1172,9 @@ const initSettings = () => {
         const provider = String(currentSettings.home_search_engine_provider || '').toLowerCase();
         searchEngineProviderSelect.value = ['local', 'google', 'baidu', 'bing'].includes(provider) ? provider : 'local';
     }
+    if (homeThemeModeSelect) homeThemeModeSelect.value = normalizeThemeMode(currentSettings.home_theme_mode);
+    if (homeThemeDarkStartHourInput) homeThemeDarkStartHourInput.value = normalizeThemeHour(currentSettings.home_theme_auto_dark_start, 19);
+    if (homeThemeDarkEndHourInput) homeThemeDarkEndHourInput.value = normalizeThemeHour(currentSettings.home_theme_auto_dark_end, 7);
 
     if (frostedGlassSwitch) frostedGlassSwitch.checked = !!currentSettings.layout_enable_frosted_glass;
     if (frostedGlassIntensityRange) frostedGlassIntensityRange.value = currentSettings.layout_frosted_glass_intensity || '15';

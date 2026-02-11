@@ -9,10 +9,19 @@
   <script>
     // Init Theme ASAP to prevent FOUC
     (function () {
-      const getMode = () => localStorage.getItem('theme_mode') || 'auto';
+      const CONFIG_THEME_MODE = '{{THEME_MODE_DEFAULT}}';
+      const CONFIG_DARK_START = Number('{{THEME_AUTO_DARK_START}}');
+      const CONFIG_DARK_END = Number('{{THEME_AUTO_DARK_END}}');
+      const fallbackMode = CONFIG_THEME_MODE === 'manual' ? 'manual' : 'auto';
+      const darkStart = Number.isFinite(CONFIG_DARK_START) ? CONFIG_DARK_START : 19;
+      const darkEnd = Number.isFinite(CONFIG_DARK_END) ? CONFIG_DARK_END : 7;
+      const getMode = () => {
+        const stored = localStorage.getItem('theme_mode');
+        return (stored === 'auto' || stored === 'manual') ? stored : fallbackMode;
+      };
       const getAutoTheme = () => {
         const hour = new Date().getHours();
-        return (hour >= 19 || hour < 7) ? 'dark' : 'light';
+        return (hour >= darkStart || hour < darkEnd) ? 'dark' : 'light';
       };
       const mode = getMode();
       const theme = mode === 'auto'
@@ -201,6 +210,6 @@
   </div>
   
   <script src="/js/autocomplete.js?v=055c686b"></script>
-  <script src="/js/main.js?v=80c8dea0"></script>
+  <script src="/js/main.js?v=0f4db2cb"></script>
 </body>
 </html>

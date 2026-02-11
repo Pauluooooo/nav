@@ -438,6 +438,26 @@
                             <p class="text-xs text-gray-400 mt-2">设置后，首页搜索框将直接使用选定引擎。</p>
                         </div>
                     </div>
+                    <div class="p-3 bg-gray-50 rounded border border-gray-100 mb-3">
+                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">主题模式</h4>
+                        <div class="mb-3">
+                            <label for="homeThemeMode" class="text-xs text-gray-500 block mb-1">首页主题初始模式</label>
+                            <select id="homeThemeMode" class="w-full text-sm p-2 border rounded bg-white">
+                                <option value="auto">自动（按时间切换）</option>
+                                <option value="manual">手动（用户双击可恢复自动）</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label for="homeThemeDarkStartHour" class="text-xs text-gray-500 block mb-1">黑暗开始时 (0-23)</label>
+                                <input type="number" id="homeThemeDarkStartHour" min="0" max="23" step="1" class="w-full text-sm p-2 border rounded bg-white" placeholder="19">
+                            </div>
+                            <div>
+                                <label for="homeThemeDarkEndHour" class="text-xs text-gray-500 block mb-1">黑暗结束时 (0-23)</label>
+                                <input type="number" id="homeThemeDarkEndHour" min="0" max="23" step="1" class="w-full text-sm p-2 border rounded bg-white" placeholder="7">
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- 标题设置 -->
                     <div class="p-3 bg-gray-50 rounded border border-gray-100">
@@ -1072,7 +1092,7 @@
     <script src="/js/admin-categories.js?v=0e04906f"></script>
     <script src="/js/admin-bookmarks.js?v=2c52bc54"></script>
     <script src="/js/admin-batch.js?v=816a6af4"></script>
-    <script src="/js/admin-settings.js?v=15c65fe8"></script>
+    <script src="/js/admin-settings.js?v=6d8e3a11"></script>
     <script src="/js/admin-import-export.js?v=210ca688"></script>
   </body>
 </html>

@@ -171,7 +171,9 @@ export async function onRequest(context) {
     'home_hide_github', 'home_hide_admin',
     'home_custom_font_url', 'home_title_font', 'home_subtitle_font', 'home_stats_font', 'home_hitokoto_font',
     'home_site_name', 'home_site_description',
-    'home_search_engine_enabled', 'home_search_engine_provider', 'home_default_category', 'home_remember_last_category',
+    'home_search_engine_enabled', 'home_search_engine_provider',
+    'home_theme_mode', 'home_theme_auto_dark_start', 'home_theme_auto_dark_end',
+    'home_default_category', 'home_remember_last_category',
     'layout_grid_cols', 'layout_custom_wallpaper', 'layout_menu_layout',
     'layout_random_wallpaper', 'bing_country',
     'layout_enable_frosted_glass', 'layout_frosted_glass_intensity',
@@ -254,6 +256,9 @@ export async function onRequest(context) {
   let homeSiteDescription = '';
   let homeSearchEngineEnabled = false;
   let homeSearchEngineProvider = 'local';
+  let homeThemeMode = 'auto';
+  let homeThemeAutoDarkStart = '19';
+  let homeThemeAutoDarkEnd = '7';
   let homeDefaultCategory = '';
   let homeRememberLastCategory = false;
   let layoutGridCols = '4';
@@ -313,6 +318,9 @@ export async function onRequest(context) {
 
       if (row.key === 'home_search_engine_enabled') homeSearchEngineEnabled = row.value === 'true';
       if (row.key === 'home_search_engine_provider') homeSearchEngineProvider = row.value;
+      if (row.key === 'home_theme_mode') homeThemeMode = row.value;
+      if (row.key === 'home_theme_auto_dark_start') homeThemeAutoDarkStart = row.value;
+      if (row.key === 'home_theme_auto_dark_end') homeThemeAutoDarkEnd = row.value;
       if (row.key === 'home_default_category') homeDefaultCategory = row.value;
       if (row.key === 'home_remember_last_category') homeRememberLastCategory = row.value === 'true';
 
@@ -345,6 +353,17 @@ export async function onRequest(context) {
     normalizedSearchEngine = homeSearchEngineEnabled ? 'baidu' : 'local';
   }
   homeSearchEngineProvider = normalizedSearchEngine;
+
+  homeThemeMode = String(homeThemeMode || '').toLowerCase() === 'manual' ? 'manual' : 'auto';
+  const normalizeThemeHour = (value, fallback) => {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (Number.isNaN(parsed) || parsed < 0 || parsed > 23) {
+      return String(fallback);
+    }
+    return String(parsed);
+  };
+  homeThemeAutoDarkStart = normalizeThemeHour(homeThemeAutoDarkStart, 19);
+  homeThemeAutoDarkEnd = normalizeThemeHour(homeThemeAutoDarkEnd, 7);
 
   // 处理站点结果
   let allSites = sitesResult.results || [];
@@ -745,6 +764,10 @@ export async function onRequest(context) {
       const safeDesc = escapeHTML(rawDesc);
 
       const hasValidUrl = Boolean(normalizedUrl);
+      const logoHtml = logoUrl
+        ? `<img src="${escapeHTML(logoUrl)}" alt="${safeName}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700" decoding="async" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.classList.remove('hidden');">
+           <div class="hidden w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`
+        : `<div class="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`;
 
   
 
@@ -944,27 +967,7 @@ export async function onRequest(context) {
 
   
 
-                                                ${
-
-  
-
-                                                  logoUrl
-
-  
-
-                                                    ? `<img src="${escapeHTML(logoUrl)}" alt="${safeName}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700" decoding="async" loading="lazy">`
-
-  
-
-                                                    : `<div class="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`
-
-  
-
-                        
-
-  
-
-                        }
+                                                ${logoHtml}
 
   
 
@@ -1427,7 +1430,10 @@ export async function onRequest(context) {
         wallpaperSource: "${wallpaperSource}",
         wallpaperCid360: "${wallpaperCid360}",
         bingCountry: "${bingCountry}",
-        searchEngine: "${homeSearchEngineProvider}"
+        searchEngine: "${homeSearchEngineProvider}",
+        themeMode: "${homeThemeMode}",
+        themeAutoDarkStart: ${homeThemeAutoDarkStart},
+        themeAutoDarkEnd: ${homeThemeAutoDarkEnd}
       };
     </script>
   `;
@@ -1441,6 +1447,9 @@ export async function onRequest(context) {
     .replace('{{HITOKOTO_CLASS}}', hitokotoClass)
     .replace('{{LEFT_TOP_ACTION}}', leftTopActionHtml)
     .replace('{{RIGHT_TOP_ACTION}}', topRightActionsHtml)
+    .replace('{{THEME_MODE_DEFAULT}}', homeThemeMode)
+    .replace('{{THEME_AUTO_DARK_START}}', homeThemeAutoDarkStart)
+    .replace('{{THEME_AUTO_DARK_END}}', homeThemeAutoDarkEnd)
     .replace(/{{SITE_NAME}}/g, escapeHTML(siteName))
     .replace(/{{SITE_DESCRIPTION}}/g, escapeHTML(siteDescription))
     .replace('{{FOOTER_TEXT}}', escapeHTML(footerText))
