@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   searchInputs.forEach(input => {
-    // Local Search Input Handler
+    // Search Input Handler (always filters local cards)
     input.addEventListener('input', function() {
         const keyword = this.value.toLowerCase().trim();
         // Sync other inputs
@@ -216,10 +216,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 otherInput.value = this.value;
             }
         });
-
-        // If external engine is selected, do not filter local sites (optional, but better UX)
-        // But keeping it might be confusing. Let's filter only if local.
-        if (currentSearchEngine !== 'local') return;
 
         const cards = sitesGrid?.querySelectorAll('.site-card');
         
