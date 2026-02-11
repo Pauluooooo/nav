@@ -8,7 +8,8 @@ class SearchAutocomplete {
     this.remoteCache = new Map();
     this.MAX_CACHE_SIZE = 200;
 
-    this.DEBOUNCE_DELAY = 250;
+    this.DEBOUNCE_DELAY = 120;
+    this.REMOTE_TIMEOUT_MS = 1200;
     this.MAX_LOCAL_SUGGESTIONS = 5;
     this.MAX_TOTAL_SUGGESTIONS = 10;
 
@@ -83,7 +84,8 @@ class SearchAutocomplete {
         if (event.key === 'Enter' && currentActive) {
           event.preventDefault();
           const value = currentActive.dataset.value || currentActive.textContent.trim();
-          this.applySuggestion(input, value);
+          const submitSearch = this.getCurrentEngine() !== 'local';
+          this.applySuggestion(input, value, { submitSearch });
           return;
         }
 
@@ -97,13 +99,21 @@ class SearchAutocomplete {
         setTimeout(() => this.hideSuggestions(), 120);
       });
 
+      list.addEventListener('mousedown', (event) => {
+        if (event.target.closest('.suggestion-item')) {
+          // Keep focus on input so blur handler does not hide the dropdown before click runs.
+          event.preventDefault();
+        }
+      });
+
       list.addEventListener('click', (event) => {
         const item = event.target.closest('.suggestion-item');
         if (!item) {
           return;
         }
         const value = item.dataset.value || item.textContent.trim();
-        this.applySuggestion(input, value);
+        const submitSearch = this.getCurrentEngine() !== 'local';
+        this.applySuggestion(input, value, { submitSearch });
       });
 
       list.addEventListener('mousemove', (event) => {
@@ -162,7 +172,7 @@ class SearchAutocomplete {
     });
   }
 
-  applySuggestion(activeInput, value) {
+  applySuggestion(activeInput, value, options = {}) {
     if (!value) {
       return;
     }
@@ -172,8 +182,14 @@ class SearchAutocomplete {
     });
     this.hideSuggestions();
 
-    if (this.getCurrentEngine() === 'local') {
+    const engine = this.getCurrentEngine();
+    if (engine === 'local') {
       activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+
+    if (options.submitSearch) {
+      this.openSearch(engine, value);
     }
   }
 
@@ -257,9 +273,10 @@ class SearchAutocomplete {
   async fetchSuggestions(keyword, dropdown, list, engine) {
     const token = ++this.requestToken;
     const localSuggestions = this.generateLocalSuggestions(keyword);
+    const immediateSuggestions = this.buildImmediateSuggestions(keyword, localSuggestions, engine);
+    this.renderAndToggle(immediateSuggestions, dropdown, list);
 
     if (engine === 'local') {
-      this.renderAndToggle(localSuggestions, dropdown, list);
       return;
     }
 
@@ -268,8 +285,20 @@ class SearchAutocomplete {
       return;
     }
 
-    const merged = this.mergeSuggestions(localSuggestions, remoteSuggestions, this.MAX_TOTAL_SUGGESTIONS);
+    let merged = this.mergeSuggestions(localSuggestions, remoteSuggestions, this.MAX_TOTAL_SUGGESTIONS);
+    if (merged.length === 0 && keyword) {
+      merged = [keyword];
+    }
     this.renderAndToggle(merged, dropdown, list);
+  }
+
+  buildImmediateSuggestions(keyword, localSuggestions, engine) {
+    if (engine === 'local') {
+      return localSuggestions;
+    }
+
+    const merged = this.mergeSuggestions([keyword], localSuggestions, this.MAX_TOTAL_SUGGESTIONS);
+    return merged;
   }
 
   async fetchRemoteSuggestions(keyword, engine) {
@@ -287,9 +316,17 @@ class SearchAutocomplete {
         q: keyword,
         engine
       });
-      const response = await fetch(`/api/search/suggestions?${params.toString()}`, {
-        headers: { Accept: 'application/json' }
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.REMOTE_TIMEOUT_MS);
+      let response;
+      try {
+        response = await fetch(`/api/search/suggestions?${params.toString()}`, {
+          headers: { Accept: 'application/json' },
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         return [];
@@ -312,7 +349,9 @@ class SearchAutocomplete {
       this.remoteCache.set(cacheKey, suggestions);
       return suggestions;
     } catch (error) {
-      console.warn('[SearchAutocomplete] Failed to load remote suggestions:', error);
+      if (error?.name !== 'AbortError') {
+        console.warn('[SearchAutocomplete] Failed to load remote suggestions:', error);
+      }
       return [];
     }
   }
@@ -371,6 +410,26 @@ class SearchAutocomplete {
       `;
       list.appendChild(li);
     });
+  }
+
+  openSearch(engine, query) {
+    const keyword = String(query || '').trim();
+    if (!keyword) {
+      return;
+    }
+
+    let url = '';
+    if (engine === 'google') {
+      url = `https://www.google.com/search?q=${encodeURIComponent(keyword)}`;
+    } else if (engine === 'baidu') {
+      url = `https://www.baidu.com/s?wd=${encodeURIComponent(keyword)}`;
+    } else if (engine === 'bing') {
+      url = `https://www.bing.com/search?q=${encodeURIComponent(keyword)}`;
+    }
+
+    if (url) {
+      window.open(url, '_blank');
+    }
   }
 }
 
