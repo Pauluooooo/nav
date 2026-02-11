@@ -160,7 +160,7 @@ export async function onRequest(context) {
   // 并行执行数据库查询（分类、设置、站点）
   const categoryQuery = isAuthenticated 
     ? 'SELECT * FROM category ORDER BY sort_order ASC, id ASC'
-    : 'SELECT * FROM category WHERE is_private = 0 ORDER BY sort_order ASC, id ASC';
+    : 'SELECT * FROM category WHERE COALESCE(is_private, 0) = 0 ORDER BY sort_order ASC, id ASC';
   
   const settingsKeys = [
     'layout_hide_desc', 'layout_hide_links', 'layout_hide_category',
@@ -186,7 +186,7 @@ export async function onRequest(context) {
   const settingsPlaceholders = settingsKeys.map(() => '?').join(',');
 
   const sitesQuery = `SELECT id, name, url, logo, desc, catelog_id, catelog_name, sort_order, is_private, create_time, update_time 
-                      FROM sites WHERE (is_private = 0 OR ? = 1) 
+                      FROM sites WHERE (COALESCE(is_private, 0) = 0 OR ? = 1) 
                       ORDER BY sort_order ASC, create_time DESC`;
 
   // 并行执行所有查询

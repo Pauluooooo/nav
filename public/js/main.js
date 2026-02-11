@@ -206,6 +206,19 @@ document.addEventListener('DOMContentLoaded', function() {
   searchInputs.forEach((input) => {
       input.placeholder = searchPlaceholder;
   });
+
+  function clearSearchInputsAfterSubmit() {
+    currentSearchKeyword = '';
+    searchInputs.forEach((input) => {
+      input.value = '';
+    });
+    const visibleCount = filterVisibleCards('');
+    updateHeading('', undefined, visibleCount);
+    if (window.searchAutocomplete && typeof window.searchAutocomplete.hideSuggestions === 'function') {
+      window.searchAutocomplete.hideSuggestions();
+    }
+  }
+  window.clearSearchInputsAfterSubmit = clearSearchInputsAfterSubmit;
   
   searchInputs.forEach(input => {
     // Search Input Handler (always filters local cards)
@@ -235,7 +248,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     case 'baidu': url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`; break;
                     case 'bing': url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`; break;
                 }
-                if (url) window.open(url, '_blank');
+                if (url) {
+                    window.open(url, '_blank');
+                    clearSearchInputsAfterSubmit();
+                }
             }
         }
     });
@@ -759,6 +775,8 @@ document.addEventListener('DOMContentLoaded', function() {
           updateGroupVisibility();
           return;
       }
+      const config = window.IORI_LAYOUT_CONFIG || {};
+      const groupedGridClass = getGroupGridClass(config.gridCols);
 
       sitesGrid.classList.remove(
           'grid',
@@ -816,7 +834,7 @@ document.addEventListener('DOMContentLoaded', function() {
           `;
 
           const groupGrid = document.createElement('div');
-          groupGrid.className = `${getGroupGridClass(layoutConfig.gridCols)} group-sites-grid`;
+          groupGrid.className = `${groupedGridClass} group-sites-grid`;
 
           orderedCards.forEach(card => {
               card.classList.remove('hidden');

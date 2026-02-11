@@ -555,6 +555,14 @@ class SearchAutocomplete {
 
     if (url) {
       window.open(url, '_blank');
+      if (typeof window.clearSearchInputsAfterSubmit === 'function') {
+        window.clearSearchInputsAfterSubmit();
+      } else {
+        this.searchInputs.forEach((input) => {
+          input.value = '';
+        });
+        this.hideSuggestions();
+      }
     }
   }
 }
