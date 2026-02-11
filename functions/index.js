@@ -365,23 +365,6 @@ export async function onRequest(context) {
     return new Response(`Failed to fetch sites: ${sitesResult.error.message}`, { status: 500 });
   }
 
-  // 首页只展示有书签的分类（并保留其父级），避免出现空分类按钮
-  if (categories.length > 0) {
-    const visibleCategoryIds = new Set();
-    allSites.forEach((site) => {
-      let currentId = Number(site.catelog_id);
-      while (currentId && categoryMap.has(currentId) && !visibleCategoryIds.has(currentId)) {
-        visibleCategoryIds.add(currentId);
-        currentId = Number(categoryMap.get(currentId).parent_id || 0);
-      }
-    });
-
-    if (visibleCategoryIds.size !== categoryMap.size) {
-      const filteredCategories = categories.filter((cat) => visibleCategoryIds.has(cat.id));
-      rebuildCategoryTree(filteredCategories);
-    }
-  }
-
   // 确定目标分类
   let requestedCatalogName = (url.searchParams.get('catalog') || '').trim();
   const explicitAll = requestedCatalogName.toLowerCase() === 'all';
