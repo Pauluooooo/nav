@@ -204,28 +204,41 @@ export async function onRequest(context) {
   const categoryIdMap = new Map(); 
   const rootCategories = [];
 
-  categories.forEach(cat => {
-    cat.children = [];
-    cat.sort_order = normalizeSortOrder(cat.sort_order);
-    categoryMap.set(cat.id, cat);
-    if (cat.catelog) {
-        categoryIdMap.set(cat.catelog, cat.id);
-    }
-  });
-
-  categories.forEach(cat => {
-    if (cat.parent_id && categoryMap.has(cat.parent_id)) {
-      categoryMap.get(cat.parent_id).children.push(cat);
-    } else {
-      rootCategories.push(cat);
-    }
-  });
-
   const sortCats = (cats) => {
     cats.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
     cats.forEach(c => sortCats(c.children));
   };
-  sortCats(rootCategories);
+
+  const rebuildCategoryTree = (sourceCategories) => {
+    categoryMap.clear();
+    categoryIdMap.clear();
+    rootCategories.length = 0;
+
+    sourceCategories.forEach((rawCat) => {
+      const cat = {
+        ...rawCat,
+        children: [],
+        sort_order: normalizeSortOrder(rawCat.sort_order)
+      };
+      categoryMap.set(cat.id, cat);
+      if (cat.catelog) {
+        categoryIdMap.set(cat.catelog, cat.id);
+      }
+    });
+
+    categoryMap.forEach((cat) => {
+      if (cat.parent_id && categoryMap.has(cat.parent_id)) {
+        categoryMap.get(cat.parent_id).children.push(cat);
+      } else {
+        rootCategories.push(cat);
+      }
+    });
+
+    sortCats(rootCategories);
+    categories = Array.from(categoryMap.values());
+  };
+
+  rebuildCategoryTree(categories);
 
   // 处理设置结果
   let layoutHideDesc = false;
@@ -350,6 +363,23 @@ export async function onRequest(context) {
   let allSites = sitesResult.results || [];
   if (sitesResult.error) {
     return new Response(`Failed to fetch sites: ${sitesResult.error.message}`, { status: 500 });
+  }
+
+  // 首页只展示有书签的分类（并保留其父级），避免出现空分类按钮
+  if (categories.length > 0) {
+    const visibleCategoryIds = new Set();
+    allSites.forEach((site) => {
+      let currentId = Number(site.catelog_id);
+      while (currentId && categoryMap.has(currentId) && !visibleCategoryIds.has(currentId)) {
+        visibleCategoryIds.add(currentId);
+        currentId = Number(categoryMap.get(currentId).parent_id || 0);
+      }
+    });
+
+    if (visibleCategoryIds.size !== categoryMap.size) {
+      const filteredCategories = categories.filter((cat) => visibleCategoryIds.has(cat.id));
+      rebuildCategoryTree(filteredCategories);
+    }
   }
 
   // 确定目标分类
