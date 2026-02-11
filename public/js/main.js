@@ -477,8 +477,64 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  function findCategoryGroupSection(catalogId, catalogName = '') {
+      if (!sitesGrid) return null;
+      if (catalogId) {
+          const escapedId = (window.CSS && typeof window.CSS.escape === 'function')
+              ? window.CSS.escape(String(catalogId))
+              : String(catalogId).replace(/"/g, '\\"');
+          const byId = sitesGrid.querySelector('.bookmark-group[data-catalog-id=' + escapedId + ']');
+          if (byId) return byId;
+      }
+
+      const normalizedName = String(catalogName || '').trim();
+      if (normalizedName) {
+          const groups = sitesGrid.querySelectorAll('.bookmark-group[data-catalog-name]');
+          for (const group of groups) {
+              if (String(group.dataset.catalogName || '').trim() === normalizedName) {
+                  return group;
+              }
+          }
+      }
+      return null;
+  }
+
+  function locateCategoryGroup(catalogId, catalogName = '') {
+      const targetSection = findCategoryGroupSection(catalogId, catalogName);
+      if (!targetSection) return null;
+
+      const header = document.querySelector('header');
+      const offset = (header ? header.getBoundingClientRect().height : 80) + 16;
+      const targetTop = targetSection.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+
+      document.querySelectorAll('.bookmark-group.group-locate-active').forEach(group => {
+          group.classList.remove('group-locate-active');
+      });
+      targetSection.classList.add('group-locate-active');
+      if (targetSection.__locateTimer) {
+          clearTimeout(targetSection.__locateTimer);
+      }
+      targetSection.__locateTimer = setTimeout(() => {
+          targetSection.classList.remove('group-locate-active');
+      }, 1400);
+
+      return targetSection;
+  }
+
+  function ensureAllSitesRenderedForGroupedView() {
+      if (!Array.isArray(window.IORI_SITES)) return 0;
+      const allSites = window.IORI_SITES;
+      const renderedCount = sitesGrid?.querySelectorAll('.site-card').length || 0;
+      const isGrouped = sitesGrid?.classList.contains('sites-grid-grouped');
+      if (!isGrouped || renderedCount !== allSites.length) {
+          renderSites(allSites);
+      }
+      return sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
+  }
+
   // ========== AJAX Navigation ==========
-  document.addEventListener('click', async (e) => {
+  document.addEventListener('click', (e) => {
     const link = e.target.closest('a[href^="?catalog="]');
     if (!link) return;
     
@@ -487,65 +543,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
     e.preventDefault();
     const href = link.getAttribute('href');
-    const catalogId = link.getAttribute('data-id');
-    
-    // 优先使用 data-name (横向菜单可能没有), 其次 textContent
-    // 但侧边栏现在有 svg，text content 会包含换行符。需要 trim。
-    let catalogName = link.textContent.trim();
+    const catalogId = String(link.getAttribute('data-id') || '').trim();
+    const catalogName = link.textContent.trim();
     
     if (typeof closeSidebarMenu === 'function') {
         closeSidebarMenu();
     }
-    
-    const sitesGrid = document.getElementById('sitesGrid');
-    if (!sitesGrid) return;
 
-    sitesGrid.style.transition = 'opacity 0.15s ease-out';
-    sitesGrid.style.opacity = '0';
+    if (!sitesGrid || !Array.isArray(window.IORI_SITES)) {
+        window.location.href = href;
+        return;
+    }
 
-    try {
-        // 如果没有预加载数据，回退到普通跳转
-        if (!window.IORI_SITES) {
-            window.location.href = href;
-            return;
-        }
+    const visibleCount = ensureAllSitesRenderedForGroupedView();
+    const config = window.IORI_LAYOUT_CONFIG || {};
 
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        sitesGrid.style.transition = 'none';
-        sitesGrid.style.opacity = '1';
-
-        const allSites = window.IORI_SITES || [];
-        let filteredSites = [];
-
-        if (catalogId) {
-            // catalogId 是字符串，site.catelog_id 是数字，需转换
-            filteredSites = allSites.filter(site => String(site.catelog_id) === String(catalogId));
-        } else {
-            // catalogId 为空表示“全部”
-            filteredSites = allSites;
-        }
-
-        renderSites(filteredSites);
-        const visibleCount = sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
-        updateHeading(currentSearchKeyword, catalogId ? catalogName : null, visibleCount);
+    if (!catalogId) {
+        updateNavigationState(null);
+        updateHeading(currentSearchKeyword, null, visibleCount);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
         updateNavigationState(catalogId);
+        const targetSection = locateCategoryGroup(catalogId, catalogName);
+        const groupVisibleCount = targetSection
+            ? targetSection.querySelectorAll('.site-card:not(.hidden)').length
+            : visibleCount;
+        updateHeading(currentSearchKeyword, catalogName || null, groupVisibleCount);
+    }
 
-        // Remember Last Category Logic
-        const config = window.IORI_LAYOUT_CONFIG || {};
-        if (config.rememberLastCategory) {
-             if (catalogId) {
-                 localStorage.setItem('iori_last_category', catalogId);
-                 setCookie('iori_last_category', catalogId, 365);
-             } else {
-                 // Explicitly save "all" state
-                 localStorage.setItem('iori_last_category', 'all');
-                 setCookie('iori_last_category', 'all', 365);
-             }
-        }
-
-    } catch (err) {
-        console.error('Client-side navigation failed:', err);
+    // In grouped-home mode, remember all to avoid reloading into filtered state.
+    if (config.rememberLastCategory) {
+        localStorage.setItem('iori_last_category', 'all');
+        setCookie('iori_last_category', 'all', 365);
     }
   });
 
@@ -834,6 +863,11 @@ document.addEventListener('DOMContentLoaded', function() {
           const orderedCards = applyStoredGroupOrder(groupName, groupCards);
           const section = document.createElement('section');
           section.className = 'bookmark-group';
+          const catalogId = findCatalogIdByName(groupName);
+          if (catalogId) {
+              section.dataset.catalogId = String(catalogId);
+          }
+          section.dataset.catalogName = String(groupName || '');
 
           section.innerHTML = `
             <div class="bookmark-group-header">
@@ -1109,47 +1143,46 @@ document.addEventListener('DOMContentLoaded', function() {
       const config = window.IORI_LAYOUT_CONFIG || {};
       const urlParams = new URLSearchParams(window.location.search);
       const hasCatalogParam = urlParams.has('catalog');
-      
-      if (config.rememberLastCategory && !hasCatalogParam) {
-          let lastId = localStorage.getItem('iori_last_category');
-          
-          // Fallback to Cookie if LocalStorage is missing (e.g. cleared or not synced)
-          if (!lastId) {
-              const match = document.cookie.match(/iori_last_category=(all|\d+)/);
-              if (match) {
-                  lastId = match[1];
-              }
-          }
 
-          if (lastId) {
-              if (lastId === 'all') {
-                  // Explicitly restore "All Categories" state
-                  const allSites = window.IORI_SITES || [];
-                  renderSites(allSites);
-                  const visibleCount = sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
-                  updateHeading(currentSearchKeyword, null, visibleCount);
-                  updateNavigationState(null);
-                  return;
-              }
+      if (hasCatalogParam) return;
 
-              // Try to find the category link in DOM to get correct Name and Href
-              const link = document.querySelector(`a[data-id="${lastId}"]`);
-              
-              if (link) {
-                  let catalogName = link.innerText.trim(); 
-                  
-                  const allSites = window.IORI_SITES || [];
-                  const filteredSites = allSites.filter(site => String(site.catelog_id) === String(lastId));
-                  
-                  renderSites(filteredSites);
-                  const visibleCount = sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
-                  updateHeading(currentSearchKeyword, catalogName, visibleCount);
-                  updateNavigationState(lastId);
-              } else {
-                  localStorage.removeItem('iori_last_category');
-              }
+      const visibleCount = ensureAllSitesRenderedForGroupedView();
+
+      if (!config.rememberLastCategory) {
+          updateHeading(currentSearchKeyword, null, visibleCount);
+          updateNavigationState(null);
+          return;
+      }
+
+      let lastId = localStorage.getItem('iori_last_category');
+      if (!lastId) {
+          const match = document.cookie.match(/iori_last_category=(all|\d+)/);
+          if (match) {
+              lastId = match[1];
           }
       }
+
+      if (!lastId || lastId === 'all') {
+          updateHeading(currentSearchKeyword, null, visibleCount);
+          updateNavigationState(null);
+          return;
+      }
+
+      const link = document.querySelector(`a[data-id="${lastId}"]`);
+      if (!link) {
+          localStorage.removeItem('iori_last_category');
+          updateHeading(currentSearchKeyword, null, visibleCount);
+          updateNavigationState(null);
+          return;
+      }
+
+      const catalogName = link.innerText.trim();
+      updateNavigationState(lastId);
+      const targetSection = locateCategoryGroup(lastId, catalogName);
+      const groupVisibleCount = targetSection
+          ? targetSection.querySelectorAll('.site-card:not(.hidden)').length
+          : visibleCount;
+      updateHeading(currentSearchKeyword, catalogName, groupVisibleCount);
   })();
 
   // Theme Toggle + Time Auto Mode

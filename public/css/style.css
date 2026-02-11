@@ -1086,6 +1086,12 @@ html:not(.dark) .dropdown-item.active {
   width: 100%;
 }
 
+.bookmark-group.group-locate-active {
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
+  transition: box-shadow 0.25s ease;
+}
+
 .bookmark-group-header {
   display: flex;
   align-items: center;
