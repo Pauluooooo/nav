@@ -127,13 +127,16 @@ export async function onRequest(context) {
   const cookies = request.headers.get('Cookie') || '';
   const hasStaleCookie = cookies.includes('iori_cache_stale=1');
   let shouldClearCookie = false;
-  const deploymentTag = String(env.CF_PAGES_COMMIT_SHA || 'local')
+  const rawCommitSha = String(env.CF_PAGES_COMMIT_SHA || '').trim();
+  const hasStableDeploymentTag = rawCommitSha.length > 0;
+  const deploymentTag = String(hasStableDeploymentTag ? rawCommitSha : 'nocache')
     .replace(/[^a-zA-Z0-9_-]/g, '')
-    .slice(0, 16) || 'local';
+    .slice(0, 16) || 'nocache';
   const cacheKeyPublic = 'home_html_' + deploymentTag + '_public';
   const cacheKeyPrivate = 'home_html_' + deploymentTag + '_private';
+  const allowHomeCache = isHomePage && hasStableDeploymentTag;
 
-  if (isHomePage) {
+  if (allowHomeCache) {
     if (isAuthenticated && hasStaleCookie) {
         // Detected stale cookie + Admin -> Clear Cache & Skip Read
         await env.NAV_AUTH.delete(cacheKeyPrivate);
@@ -160,7 +163,12 @@ export async function onRequest(context) {
   // 并行执行数据库查询（分类、设置、站点）
   const categoryQuery = isAuthenticated 
     ? 'SELECT * FROM category ORDER BY sort_order ASC, id ASC'
-    : 'SELECT * FROM category WHERE COALESCE(is_private, 0) = 0 ORDER BY sort_order ASC, id ASC';
+    : `SELECT * FROM category
+       WHERE (CASE
+         WHEN LOWER(TRIM(CAST(is_private AS TEXT))) IN ('1', 'true') THEN 1
+         ELSE 0
+       END) = 0
+       ORDER BY sort_order ASC, id ASC`;
   
   const settingsKeys = [
     'layout_hide_desc', 'layout_hide_links', 'layout_hide_category',
@@ -186,7 +194,10 @@ export async function onRequest(context) {
   const settingsPlaceholders = settingsKeys.map(() => '?').join(',');
 
   const sitesQuery = `SELECT id, name, url, logo, desc, catelog_id, catelog_name, sort_order, is_private, create_time, update_time 
-                      FROM sites WHERE (COALESCE(is_private, 0) = 0 OR ? = 1) 
+                      FROM sites WHERE ((CASE
+                        WHEN LOWER(TRIM(CAST(is_private AS TEXT))) IN ('1', 'true') THEN 1
+                        ELSE 0
+                      END) = 0 OR ? = 1) 
                       ORDER BY sort_order ASC, create_time DESC`;
 
   // 并行执行所有查询
@@ -1487,7 +1498,7 @@ export async function onRequest(context) {
   }
 
   // 写入缓存 (只要不是管理员强制刷新或 Stale 状态，都应该写入缓存，包括随机壁纸开启的情况)
-  if (isHomePage) {
+  if (allowHomeCache) {
     const cacheKey = isAuthenticated ? cacheKeyPrivate : cacheKeyPublic;
     context.waitUntil(env.NAV_AUTH.put(cacheKey, html));
   }

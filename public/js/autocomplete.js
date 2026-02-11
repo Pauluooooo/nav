@@ -243,6 +243,15 @@ class SearchAutocomplete {
     this.hideSuggestions();
 
     if (normalizedSuggestion?.type === 'bookmark' && this.isSafeHttpUrl(normalizedSuggestion.url)) {
+      if (typeof window.clearSearchInputsAfterSubmit === 'function') {
+        window.clearSearchInputsAfterSubmit();
+      } else {
+        this.searchInputs.forEach((input) => {
+          input.value = '';
+        });
+        this.hideSuggestions();
+        activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       this.openBookmark(normalizedSuggestion.url);
       return;
     }
