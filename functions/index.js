@@ -1067,10 +1067,6 @@ export async function onRequest(context) {
   const submissionEnabled = String(env.ENABLE_PUBLIC_SUBMISSION) === 'true';
   const submissionClass = submissionEnabled ? '' : 'hidden';
 
-  const siteName = homeSiteName || env.SITE_NAME || '灰色轨迹';
-  const siteDescription = homeSiteDescription || env.SITE_DESCRIPTION || '一个优雅、快速、易于部署的书签（网址）收藏与分享平台，完全基于 Cloudflare 全家桶构建';
-  const footerText = env.FOOTER_TEXT || '曾梦想仗剑走天涯';
-
   // Build Style Strings
   const getStyleStr = (size, color, font) => {
     let s = '';
@@ -1084,7 +1080,6 @@ export async function onRequest(context) {
   const subtitleStyle = getStyleStr(homeSubtitleSize, homeSubtitleColor, homeSubtitleFont);
   const statsStyle = getStyleStr(homeStatsSize, homeStatsColor, homeStatsFont);
   const hitokotoStyle = getStyleStr(homeHitokotoSize, homeHitokotoColor, homeHitokotoFont);
-  const hitokotoContent = homeHideHitokoto ? '' : '疏影横斜水清浅,暗香浮动月黄昏。';
 
   // Determine if the stats row should be rendered with padding/margin
   const shouldRenderStatsRow = !homeHideStats || !homeHideHitokoto;
