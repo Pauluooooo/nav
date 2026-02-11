@@ -127,15 +127,20 @@ export async function onRequest(context) {
   const cookies = request.headers.get('Cookie') || '';
   const hasStaleCookie = cookies.includes('iori_cache_stale=1');
   let shouldClearCookie = false;
+  const deploymentTag = String(env.CF_PAGES_COMMIT_SHA || 'local')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 16) || 'local';
+  const cacheKeyPublic = 'home_html_' + deploymentTag + '_public';
+  const cacheKeyPrivate = 'home_html_' + deploymentTag + '_private';
 
   if (isHomePage) {
     if (isAuthenticated && hasStaleCookie) {
         // Detected stale cookie + Admin -> Clear Cache & Skip Read
-        await env.NAV_AUTH.delete('home_html_private');
-        await env.NAV_AUTH.delete('home_html_public');
+        await env.NAV_AUTH.delete(cacheKeyPrivate);
+        await env.NAV_AUTH.delete(cacheKeyPublic);
         shouldClearCookie = true;
     } else {
-        const cacheKey = isAuthenticated ? 'home_html_private' : 'home_html_public';
+        const cacheKey = isAuthenticated ? cacheKeyPrivate : cacheKeyPublic;
         try {
           const cachedHtml = await env.NAV_AUTH.get(cacheKey);
           if (cachedHtml) {
@@ -1084,18 +1089,18 @@ export async function onRequest(context) {
   // 搜索引擎选项 HTML
   const searchEngineOptions = homeSearchEngineEnabled ? `
     <div class="flex justify-center items-center gap-3 mb-4 text-sm select-none search-engine-wrapper">
-        <label class="search-engine-option active" data-engine="local">
+        <button type="button" class="search-engine-option active" data-engine="local">
             <span>站内</span>
-        </label>
-        <label class="search-engine-option" data-engine="google">
+        </button>
+        <button type="button" class="search-engine-option" data-engine="google">
             <span>Google</span>
-        </label>
-        <label class="search-engine-option" data-engine="baidu">
+        </button>
+        <button type="button" class="search-engine-option" data-engine="baidu">
             <span>Baidu</span>
-        </label>
-        <label class="search-engine-option" data-engine="bing">
+        </button>
+        <button type="button" class="search-engine-option" data-engine="bing">
             <span>Bing</span>
-        </label>
+        </button>
     </div>
     <script>
     (function(){
@@ -1488,7 +1493,7 @@ export async function onRequest(context) {
 
   // 写入缓存 (只要不是管理员强制刷新或 Stale 状态，都应该写入缓存，包括随机壁纸开启的情况)
   if (isHomePage) {
-    const cacheKey = isAuthenticated ? 'home_html_private' : 'home_html_public';
+    const cacheKey = isAuthenticated ? cacheKeyPrivate : cacheKeyPublic;
     context.waitUntil(env.NAV_AUTH.put(cacheKey, html));
   }
 

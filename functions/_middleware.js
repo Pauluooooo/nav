@@ -41,10 +41,16 @@ export function jsonResponse(data, status = 200) {
 
 export async function clearHomeCache(env) {
   try {
-    await Promise.all([
-      env.NAV_AUTH.delete('home_html_public'),
-      env.NAV_AUTH.delete('home_html_private')
-    ]);
+    const keysToDelete = new Set(['home_html_public', 'home_html_private']);
+    let cursor;
+
+    do {
+      const list = await env.NAV_AUTH.list({ prefix: 'home_html_', cursor, limit: 1000 });
+      (list.keys || []).forEach(item => keysToDelete.add(item.name));
+      cursor = list.list_complete ? undefined : list.cursor;
+    } while (cursor);
+
+    await Promise.all(Array.from(keysToDelete).map(key => env.NAV_AUTH.delete(key)));
     console.log('Home cache cleared');
   } catch (e) {
     console.error('Failed to clear home cache:', e);

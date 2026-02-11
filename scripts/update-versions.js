@@ -23,6 +23,7 @@ const HTML_FILES = {
   'public/index.html': [
     { file: 'public/css/style.css', pattern: /\/css\/style\.css\?v=[a-zA-Z0-9]+/ },
     { file: 'public/css/tailwind.min.css', pattern: /\/css\/tailwind\.min\.css\?v=[a-zA-Z0-9]+/ },
+    { file: 'public/js/autocomplete.js', pattern: /\/js\/autocomplete\.js\?v=[a-zA-Z0-9]+/ },
     { file: 'public/js/main.js', pattern: /\/js\/main\.js\?v=[a-zA-Z0-9]+/ },
     { file: 'public/favicon.svg', pattern: /\/favicon\.svg\?v=[a-zA-Z0-9]+/ },
   ],
