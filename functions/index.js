@@ -386,35 +386,8 @@ export async function onRequest(context) {
   let requestedCatalogName = (url.searchParams.get('catalog') || '').trim();
   const explicitAll = requestedCatalogName.toLowerCase() === 'all';
   
-  if (!requestedCatalogName && !explicitAll) {
-      // 优先级：Cookie (如果开启记忆) > 数据库默认设置
-      let cookieCatId = null;
-      let isCookieAll = false;
-      if (homeRememberLastCategory) {
-          const cookies = request.headers.get('Cookie') || '';
-          const match = cookies.match(/iori_last_category=(all|\d+)/);
-          if (match) {
-              if (match[1] === 'all') {
-                  isCookieAll = true;
-              } else {
-                  cookieCatId = parseInt(match[1]);
-              }
-          }
-      }
-
-      if (isCookieAll) {
-          // Explicitly set to 'all' to bypass default category logic
-          requestedCatalogName = 'all';
-      } else if (cookieCatId && categoryMap.has(cookieCatId)) {
-          // 通过 ID 反查 Name (因为后续逻辑基于 Name)
-          requestedCatalogName = categoryMap.get(cookieCatId).catelog;
-      } else {
-          // Fallback to Default Category
-          const defaultCat = (homeDefaultCategory || '').trim();
-          if (defaultCat && categoryIdMap.has(defaultCat)) {
-              requestedCatalogName = defaultCat;
-          }
-      }
+  if (explicitAll) {
+      requestedCatalogName = '';
   }
 
   let targetCategoryIds = [];
@@ -958,7 +931,7 @@ export async function onRequest(context) {
 
   
 
-                                <div class="${baseCardClass} ${frostedClass} ${cardStyleClass} card-anim-enter" ${animStyle} data-id="${site.id}" data-name="${escapeHTML(site.name)}" data-url="${escapeHTML(normalizedUrl)}" data-catalog="${escapeHTML(site.catelog_name || site.catelog || '未分类')}" data-desc="${safeDesc}">
+                                <div class="${baseCardClass} ${frostedClass} ${cardStyleClass} card-anim-enter" ${animStyle} data-id="${site.id}" data-name="${escapeHTML(site.name)}" data-url="${escapeHTML(normalizedUrl)}" data-catalog-id="${escapeHTML(String(site.catelog_id ?? ''))}" data-catalog="${escapeHTML(site.catelog_name || site.catelog || '未分类')}" data-desc="${safeDesc}">
 
   
 

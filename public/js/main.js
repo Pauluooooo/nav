@@ -483,7 +483,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const escapedId = (window.CSS && typeof window.CSS.escape === 'function')
               ? window.CSS.escape(String(catalogId))
               : String(catalogId).replace(/"/g, '\\"');
-          const byId = sitesGrid.querySelector('.bookmark-group[data-catalog-id=' + escapedId + ']');
+          const byId = sitesGrid.querySelector(`.bookmark-group[data-catalog-id="${escapedId}"]`);
           if (byId) return byId;
       }
 
@@ -571,10 +571,11 @@ document.addEventListener('DOMContentLoaded', function() {
         updateHeading(currentSearchKeyword, catalogName || null, groupVisibleCount);
     }
 
-    // In grouped-home mode, remember all to avoid reloading into filtered state.
+    // In grouped-home mode, remember the last located group id.
     if (config.rememberLastCategory) {
-        localStorage.setItem('iori_last_category', 'all');
-        setCookie('iori_last_category', 'all', 365);
+        const rememberValue = catalogId ? String(catalogId) : 'all';
+        localStorage.setItem('iori_last_category', rememberValue);
+        setCookie('iori_last_category', rememberValue, 365);
     }
   });
 
@@ -612,14 +613,15 @@ document.addEventListener('DOMContentLoaded', function() {
       return '';
   }
 
-  function getGroupStorageKey(groupName) {
-      const catalogId = findCatalogIdByName(groupName);
-      const key = catalogId || String(groupName || '').toLowerCase();
+  function getGroupStorageKey(groupName, catalogId = '') {
+      const normalizedCatalogId = String(catalogId || '').trim();
+      const resolvedCatalogId = normalizedCatalogId || findCatalogIdByName(groupName);
+      const key = resolvedCatalogId || String(groupName || '').toLowerCase();
       return `iori_group_sort_${encodeURIComponent(key)}`;
   }
 
-  function loadGroupSortOrder(groupName) {
-      const raw = localStorage.getItem(getGroupStorageKey(groupName));
+  function loadGroupSortOrder(groupName, catalogId = '') {
+      const raw = localStorage.getItem(getGroupStorageKey(groupName, catalogId));
       if (!raw) return [];
       try {
           const parsed = JSON.parse(raw);
@@ -629,8 +631,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   }
 
-  function applyGroupSortOrder(groupName, cards) {
-      const orderList = loadGroupSortOrder(groupName);
+  function applyGroupSortOrder(groupName, cards, catalogId = '') {
+      const orderList = loadGroupSortOrder(groupName, catalogId);
       if (!orderList.length) return cards;
       const orderIndex = new Map(orderList.map((id, index) => [String(id), index]));
       return [...cards].sort((a, b) => {
@@ -643,12 +645,12 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   }
 
-  function saveGroupSortOrder(groupName, groupGrid) {
+  function saveGroupSortOrder(groupName, groupGrid, catalogId = '') {
       if (!groupGrid) return;
       const ids = Array.from(groupGrid.querySelectorAll('.site-card'))
           .map(card => card.getAttribute('data-id'))
           .filter(Boolean);
-      localStorage.setItem(getGroupStorageKey(groupName), JSON.stringify(ids));
+      localStorage.setItem(getGroupStorageKey(groupName, catalogId), JSON.stringify(ids));
   }
 
   function getGroupGridClass(gridCols) {
@@ -659,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
       return 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 justify-items-center';
   }
 
-  function setupGroupSorting(groupGrid, groupName) {
+  function setupGroupSorting(groupGrid, groupName, catalogId = '') {
       let draggedItem = null;
 
       groupGrid.addEventListener('dragstart', (event) => {
@@ -690,7 +692,7 @@ document.addEventListener('DOMContentLoaded', function() {
           draggedItem.classList.remove('dragging');
           draggedItem = null;
           document.body.classList.remove('drag-sorting');
-          saveGroupSortOrder(groupName, groupGrid);
+          saveGroupSortOrder(groupName, groupGrid, catalogId);
       });
 
       // Touch sorting (mobile)
@@ -727,7 +729,7 @@ document.addEventListener('DOMContentLoaded', function() {
               dragGhost = null;
           }
           document.body.classList.remove('drag-sorting');
-          saveGroupSortOrder(groupName, groupGrid);
+          saveGroupSortOrder(groupName, groupGrid, catalogId);
       };
 
       groupGrid.addEventListener('touchstart', (event) => {
@@ -844,7 +846,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       const grouped = new Map();
       cards.forEach(card => {
-          const groupName = String(card.dataset.catalog || '未分类').trim() || '未分类';
+          const groupName = String(card.dataset.catalog || '').trim() || '未分类';
           if (!grouped.has(groupName)) grouped.set(groupName, []);
           grouped.get(groupName).push(card);
       });
@@ -860,10 +862,10 @@ document.addEventListener('DOMContentLoaded', function() {
       });
 
       sortedGroups.forEach(([groupName, groupCards]) => {
-          const orderedCards = applyStoredGroupOrder(groupName, groupCards);
+          const catalogId = findCatalogIdByName(groupName);
+          const orderedCards = applyGroupSortOrder(groupName, groupCards, catalogId);
           const section = document.createElement('section');
           section.className = 'bookmark-group';
-          const catalogId = findCatalogIdByName(groupName);
           if (catalogId) {
               section.dataset.catalogId = String(catalogId);
           }
@@ -893,7 +895,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
           section.appendChild(groupGrid);
           sitesGrid.appendChild(section);
-          setupGroupSorting(groupGrid, groupName);
+          setupGroupSorting(groupGrid, groupName, catalogId);
       });
       } catch (error) {
           console.error('[groupRenderedCards] fallback to flat layout:', error);
@@ -981,9 +983,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (delay > 0) card.style.removeProperty('animation-delay');
         }, { once: true });
         
+        const catalogId = String(site.catelog_id ?? '').trim();
         card.setAttribute('data-name', safeName);
         card.setAttribute('data-url', safeUrl);
         card.setAttribute('data-catalog', safeCatalog);
+        if (catalogId) {
+            card.setAttribute('data-catalog-id', catalogId);
+        } else {
+            card.removeAttribute('data-catalog-id');
+        }
         card.setAttribute('data-desc', safeDesc);
         card.setAttribute('data-id', String(site.id || ''));
         
