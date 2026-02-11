@@ -10,10 +10,6 @@
   <a href="#-快速部署">快速部署</a> •
   <a href="#-环境变量说明">变量说明</a> •
 </p>
-
-<p align="center">
-  <strong>在线体验:</strong> <a href="https://iori.hidns.vip/">https://iori.hidns.vip</a>
-</p>
 ---
 
 ## 🖼️ 效果预览
@@ -166,14 +162,3 @@
 ## 📄 许可证
 
 本项目采用 [MIT](LICENSE) 许可证。
-
-## 📞 联系方式
-
--   **项目作者**: [@灰色轨迹](https://github.com/jy02739244)
--   **项目链接**: [https://github.com/jy02739244/iori-nav](https://github.com/jy02739244/iori-nav)
-
-<p align="center">如果你喜欢这个项目，请给它一个 ⭐️！</p>
-
-## 星星走起
-
-[![Star History Chart](https://api.star-history.com/svg?repos=jy02739244/iori-nav&type=date&legend=top-left)](https://www.star-history.com/#jy02739244/iori-nav&type=date&legend=top-left)
