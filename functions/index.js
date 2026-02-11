@@ -204,41 +204,28 @@ export async function onRequest(context) {
   const categoryIdMap = new Map(); 
   const rootCategories = [];
 
+  categories.forEach(cat => {
+    cat.children = [];
+    cat.sort_order = normalizeSortOrder(cat.sort_order);
+    categoryMap.set(cat.id, cat);
+    if (cat.catelog) {
+        categoryIdMap.set(cat.catelog, cat.id);
+    }
+  });
+
+  categories.forEach(cat => {
+    if (cat.parent_id && categoryMap.has(cat.parent_id)) {
+      categoryMap.get(cat.parent_id).children.push(cat);
+    } else {
+      rootCategories.push(cat);
+    }
+  });
+
   const sortCats = (cats) => {
     cats.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
     cats.forEach(c => sortCats(c.children));
   };
-
-  const rebuildCategoryTree = (sourceCategories) => {
-    categoryMap.clear();
-    categoryIdMap.clear();
-    rootCategories.length = 0;
-
-    sourceCategories.forEach((rawCat) => {
-      const cat = {
-        ...rawCat,
-        children: [],
-        sort_order: normalizeSortOrder(rawCat.sort_order)
-      };
-      categoryMap.set(cat.id, cat);
-      if (cat.catelog) {
-        categoryIdMap.set(cat.catelog, cat.id);
-      }
-    });
-
-    categoryMap.forEach((cat) => {
-      if (cat.parent_id && categoryMap.has(cat.parent_id)) {
-        categoryMap.get(cat.parent_id).children.push(cat);
-      } else {
-        rootCategories.push(cat);
-      }
-    });
-
-    sortCats(rootCategories);
-    categories = Array.from(categoryMap.values());
-  };
-
-  rebuildCategoryTree(categories);
+  sortCats(rootCategories);
 
   // 处理设置结果
   let layoutHideDesc = false;
