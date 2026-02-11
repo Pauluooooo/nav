@@ -86,7 +86,7 @@ const initSettings = () => {
   const homeSiteNameInput = document.getElementById('homeSiteName');
   const homeSiteDescriptionInput = document.getElementById('homeSiteDescription');
 
-  const searchEngineSwitch = document.getElementById('searchEngineSwitch');
+  const searchEngineProviderSelect = document.getElementById('searchEngineProvider');
 
   // Font Options
   const FONT_OPTIONS = [
@@ -337,6 +337,7 @@ const initSettings = () => {
     home_hitokoto_size: '',
     home_hitokoto_color: '',
     home_search_engine_enabled: false,
+    home_search_engine_provider: 'local',
     home_default_category: '',
     home_remember_last_category: false,
     layout_enable_frosted_glass: false,
@@ -786,7 +787,12 @@ const initSettings = () => {
         currentSettings.home_remember_last_category = homeRememberLastCategorySwitch.checked;
     }
 
-    currentSettings.home_search_engine_enabled = searchEngineSwitch.checked;
+    const rawSearchProvider = (searchEngineProviderSelect?.value || 'local').toLowerCase();
+    const normalizedSearchProvider = ['local', 'google', 'baidu', 'bing'].includes(rawSearchProvider)
+      ? rawSearchProvider
+      : 'local';
+    currentSettings.home_search_engine_provider = normalizedSearchProvider;
+    currentSettings.home_search_engine_enabled = normalizedSearchProvider !== 'local';
 
     currentSettings.layout_custom_wallpaper = customWallpaperInput.value.trim();
     currentSettings.layout_random_wallpaper = randomWallpaperSwitch.checked;
@@ -958,6 +964,14 @@ const initSettings = () => {
             if (serverSettings.home_site_description) currentSettings.home_site_description = serverSettings.home_site_description;
 
             if (serverSettings.home_search_engine_enabled !== undefined) currentSettings.home_search_engine_enabled = serverSettings.home_search_engine_enabled === 'true';
+            if (serverSettings.home_search_engine_provider !== undefined) {
+                const provider = String(serverSettings.home_search_engine_provider || '').toLowerCase();
+                currentSettings.home_search_engine_provider = ['local', 'google', 'baidu', 'bing'].includes(provider) ? provider : 'local';
+            } else if (currentSettings.home_search_engine_enabled) {
+                currentSettings.home_search_engine_provider = 'baidu';
+            } else {
+                currentSettings.home_search_engine_provider = 'local';
+            }
             
             if (serverSettings.home_default_category) currentSettings.home_default_category = serverSettings.home_default_category;
             if (serverSettings.home_remember_last_category !== undefined) currentSettings.home_remember_last_category = serverSettings.home_remember_last_category === 'true';
@@ -1128,7 +1142,10 @@ const initSettings = () => {
     if (homeDefaultCategorySelect) homeDefaultCategorySelect.value = currentSettings.home_default_category || '';
     if (homeRememberLastCategorySwitch) homeRememberLastCategorySwitch.checked = !!currentSettings.home_remember_last_category;
 
-    if (searchEngineSwitch) searchEngineSwitch.checked = !!currentSettings.home_search_engine_enabled;
+    if (searchEngineProviderSelect) {
+        const provider = String(currentSettings.home_search_engine_provider || '').toLowerCase();
+        searchEngineProviderSelect.value = ['local', 'google', 'baidu', 'bing'].includes(provider) ? provider : 'local';
+    }
 
     if (frostedGlassSwitch) frostedGlassSwitch.checked = !!currentSettings.layout_enable_frosted_glass;
     if (frostedGlassIntensityRange) frostedGlassIntensityRange.value = currentSettings.layout_frosted_glass_intensity || '15';

@@ -190,80 +190,25 @@ document.addEventListener('DOMContentLoaded', function() {
   const searchInputs = document.querySelectorAll('.search-input-target');
   const sitesGrid = document.getElementById('sitesGrid');
   
-  // Initialize Search Engine UI based on saved preference
-  const engineOptions = document.querySelectorAll('.search-engine-option');
-  
-  // 如果外部搜索被禁用（没有搜索引擎选项），强制使用本地搜索
-  let currentSearchEngine = 'local';
-  if (engineOptions.length > 0) {
-    currentSearchEngine = localStorage.getItem('search_engine') || 'local';
-  } else {
-    // 清除之前保存的外部搜索引擎选择
-    localStorage.removeItem('search_engine');
-  }
+  const allowedSearchEngines = new Set(['local', 'google', 'baidu', 'bing']);
+  const configuredSearchEngine = String(window.IORI_LAYOUT_CONFIG?.searchEngine || 'local').toLowerCase();
+  const currentSearchEngine = allowedSearchEngines.has(configuredSearchEngine) ? configuredSearchEngine : 'local';
   window.currentSearchEngine = currentSearchEngine;
-  
-  function updateSearchEngineUI(engine) {
-      // Update Active Class
-      engineOptions.forEach(opt => {
-          if (opt.dataset.engine === engine) {
-              opt.classList.add('active');
-          } else {
-              opt.classList.remove('active');
-          }
-      });
-      
-      // Update Placeholder
-      let placeholder = '搜索书签...';
-      switch (engine) {
-          case 'google': placeholder = 'Google 搜索...'; break;
-          case 'baidu': placeholder = '百度搜索...'; break;
-          case 'bing': placeholder = 'Bing 搜索...'; break;
-      }
-      
-      searchInputs.forEach(input => {
-          input.placeholder = placeholder;
-          // If switching back to local, trigger filter immediately if input has value
-          if (engine === 'local' && input.value.trim()) {
-              input.dispatchEvent(new Event('input'));
-          }
-      });
-  }
 
-  // Apply initial state
-  if (engineOptions.length > 0) {
-      updateSearchEngineUI(currentSearchEngine);
-  }
-
-  // Search Engine Switching Logic
-  engineOptions.forEach(option => {
-      option.addEventListener('click', () => {
-          currentSearchEngine = option.dataset.engine;
-          window.currentSearchEngine = currentSearchEngine;
-          localStorage.setItem('search_engine', currentSearchEngine); // Save to storage
-          updateSearchEngineUI(currentSearchEngine);
-
-          // 清除搜索框值和下拉列表
-          searchInputs.forEach(input => {
-              input.value = '';
-              input.focus();
-          });
-
-          // Clear search suggestions when engine is switched
-          if (window.searchAutocomplete) {
-              window.searchAutocomplete.hideSuggestions();
-              window.searchAutocomplete.currentEngine = currentSearchEngine;  // 同步状态
-          }
-      });
+  const searchPlaceholderMap = {
+      local: '搜索书签...',
+      google: 'Google 搜索...',
+      baidu: '百度搜索...',
+      bing: 'Bing 搜索...'
+  };
+  const searchPlaceholder = searchPlaceholderMap[currentSearchEngine] || searchPlaceholderMap.local;
+  searchInputs.forEach((input) => {
+      input.placeholder = searchPlaceholder;
   });
   
   searchInputs.forEach(input => {
     // Local Search Input Handler
     input.addEventListener('input', function() {
-        // If external engine is selected, do not filter local sites (optional, but better UX)
-        // But keeping it might be confusing. Let's filter only if local.
-        if (currentSearchEngine !== 'local') return;
-
         const keyword = this.value.toLowerCase().trim();
         // Sync other inputs
         searchInputs.forEach(otherInput => {
@@ -271,6 +216,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 otherInput.value = this.value;
             }
         });
+
+        // If external engine is selected, do not filter local sites (optional, but better UX)
+        // But keeping it might be confusing. Let's filter only if local.
+        if (currentSearchEngine !== 'local') return;
 
         const cards = sitesGrid?.querySelectorAll('.site-card');
         
@@ -292,6 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // External Search Enter Handler
     input.addEventListener('keydown', function(e) {
+        if (e.defaultPrevented) return;
         if (e.key === 'Enter' && currentSearchEngine !== 'local') {
             e.preventDefault();
             const query = this.value.trim();
@@ -900,6 +850,26 @@ document.addEventListener('DOMContentLoaded', function() {
           });
       });
   }
+
+  // ========== Mobile Keyboard Background Stability ==========
+  (function() {
+      const bgContainer = document.getElementById('fixed-background');
+      if (!bgContainer || !window.visualViewport) return;
+
+      const syncBackgroundOffset = () => {
+          const offsetTop = Math.max(window.visualViewport.offsetTop || 0, 0);
+          if (offsetTop > 0) {
+              bgContainer.style.transform = `translate3d(0, ${offsetTop}px, 0)`;
+          } else {
+              bgContainer.style.removeProperty('transform');
+          }
+      };
+
+      window.visualViewport.addEventListener('resize', syncBackgroundOffset);
+      window.visualViewport.addEventListener('scroll', syncBackgroundOffset);
+      window.addEventListener('orientationchange', () => setTimeout(syncBackgroundOffset, 120));
+      syncBackgroundOffset();
+  })();
 
   // ========== Random Wallpaper Logic (Client-side) ==========
   (async function() {

@@ -171,7 +171,7 @@ export async function onRequest(context) {
     'home_hide_github', 'home_hide_admin',
     'home_custom_font_url', 'home_title_font', 'home_subtitle_font', 'home_stats_font', 'home_hitokoto_font',
     'home_site_name', 'home_site_description',
-    'home_search_engine_enabled', 'home_default_category', 'home_remember_last_category',
+    'home_search_engine_enabled', 'home_search_engine_provider', 'home_default_category', 'home_remember_last_category',
     'layout_grid_cols', 'layout_custom_wallpaper', 'layout_menu_layout',
     'layout_random_wallpaper', 'bing_country',
     'layout_enable_frosted_glass', 'layout_frosted_glass_intensity',
@@ -253,6 +253,7 @@ export async function onRequest(context) {
   let homeSiteName = '';
   let homeSiteDescription = '';
   let homeSearchEngineEnabled = false;
+  let homeSearchEngineProvider = 'local';
   let homeDefaultCategory = '';
   let homeRememberLastCategory = false;
   let layoutGridCols = '4';
@@ -311,6 +312,7 @@ export async function onRequest(context) {
       if (row.key === 'home_site_description') homeSiteDescription = row.value;
 
       if (row.key === 'home_search_engine_enabled') homeSearchEngineEnabled = row.value === 'true';
+      if (row.key === 'home_search_engine_provider') homeSearchEngineProvider = row.value;
       if (row.key === 'home_default_category') homeDefaultCategory = row.value;
       if (row.key === 'home_remember_last_category') homeRememberLastCategory = row.value === 'true';
 
@@ -336,6 +338,13 @@ export async function onRequest(context) {
       if (row.key === 'card_desc_color') cardDescColor = row.value;
     });
   }
+
+  const allowedSearchEngines = new Set(['local', 'google', 'baidu', 'bing']);
+  let normalizedSearchEngine = String(homeSearchEngineProvider || '').toLowerCase();
+  if (!allowedSearchEngines.has(normalizedSearchEngine)) {
+    normalizedSearchEngine = homeSearchEngineEnabled ? 'baidu' : 'local';
+  }
+  homeSearchEngineProvider = normalizedSearchEngine;
 
   // 处理站点结果
   let allSites = sitesResult.results || [];
@@ -1086,46 +1095,13 @@ export async function onRequest(context) {
   const horizontalTitleHtml = layoutHideTitle ? '' : `<h1 class="text-3xl md:text-4xl font-bold tracking-tight mb-3 ${titleColorClass}" ${titleStyle}>{{SITE_NAME}}</h1>`;
   const horizontalSubtitleHtml = layoutHideSubtitle ? '' : `<p class="${subTextColorClass} opacity-90 text-sm md:text-base" ${subtitleStyle}>{{SITE_DESCRIPTION}}</p>`;
 
-  // 搜索引擎选项 HTML
-  const searchEngineOptions = homeSearchEngineEnabled ? `
-    <div class="flex justify-center items-center gap-3 mb-4 text-sm select-none search-engine-wrapper">
-        <button type="button" class="search-engine-option active" data-engine="local">
-            <span>站内</span>
-        </button>
-        <button type="button" class="search-engine-option" data-engine="google">
-            <span>Google</span>
-        </button>
-        <button type="button" class="search-engine-option" data-engine="baidu">
-            <span>Baidu</span>
-        </button>
-        <button type="button" class="search-engine-option" data-engine="bing">
-            <span>Bing</span>
-        </button>
-    </div>
-    <script>
-    (function(){
-      try {
-        var saved = localStorage.getItem('search_engine');
-        if(saved && saved !== 'local'){
-          var wrappers = document.querySelectorAll('.search-engine-wrapper');
-          wrappers.forEach(function(w){
-             var opts = w.querySelectorAll('.search-engine-option');
-             opts.forEach(function(opt){
-               if(opt.dataset.engine === saved) opt.classList.add('active');
-               else opt.classList.remove('active');
-             });
-          });
-          var inputs = document.querySelectorAll('.search-input-target');
-          var ph = '搜索书签...';
-          if(saved === 'google') ph = 'Google 搜索...';
-          if(saved === 'baidu') ph = '百度搜索...';
-          if(saved === 'bing') ph = 'Bing 搜索...';
-          inputs.forEach(function(i){ i.placeholder = ph; });
-        }
-      } catch(e){}
-    })();
-    </script>
-  ` : '';
+  const searchPlaceholderMap = {
+    local: '搜索书签...',
+    google: 'Google 搜索...',
+    baidu: '百度搜索...',
+    bing: 'Bing 搜索...'
+  };
+  const searchInputPlaceholder = searchPlaceholderMap[homeSearchEngineProvider] || searchPlaceholderMap.local;
 
   const verticalHeaderContent = `
       <div class="max-w-4xl mx-auto text-center relative z-10 ${themeClass} py-8">
@@ -1135,10 +1111,9 @@ export async function onRequest(context) {
         </div>
 
         <div class="relative max-w-xl mx-auto">
-            ${searchEngineOptions}
             <div class="search-input-target-wrapper relative">
                 <div class="relative">
-                    <input type="text" name="search" placeholder="搜索书签..." class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
+                    <input type="text" name="search" aria-label="搜索" placeholder="${searchInputPlaceholder}" class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -1158,10 +1133,9 @@ export async function onRequest(context) {
         </div>
 
         <div class="relative max-w-xl mx-auto mb-8">
-            ${searchEngineOptions}
             <div class="search-input-target-wrapper relative">
                 <div class="relative">
-                    <input id="headerSearchInput" type="text" name="search" placeholder="搜索书签..." class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
+                    <input id="headerSearchInput" type="text" name="search" aria-label="搜索" placeholder="${searchInputPlaceholder}" class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -1311,13 +1285,13 @@ export async function onRequest(context) {
       // transform: scale(1.02) 是为了防止模糊后边缘出现白边
       
       bgLayerHtml = `
-        <div id="fixed-background" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -9999; pointer-events: none; overflow: hidden;">
+        <div id="fixed-background" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;">
           <img src="${safeWallpaperUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; ${blurStyle}" />
         </div>
       `;
   } else {
       bgLayerHtml = `
-        <div id="fixed-background" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -9999; pointer-events: none; background-color: ${defaultBgColor};"></div>
+        <div id="fixed-background" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background-color: ${defaultBgColor};"></div>
       `;
   }
   
@@ -1329,26 +1303,36 @@ export async function onRequest(context) {
         padding: 0;
         width: 100%;
         height: 100%;
-        overflow: hidden; /* 关键：禁止 body 滚动，交由内部容器接管 */
       }
       #app-scroll {
         width: 100%;
-        height: 100%;
+        height: 100dvh;
+        min-height: 100%;
         overflow-y: auto; /* 允许纵向滚动 */
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch; /* iOS 原生惯性滚动 */
+        position: relative;
+        z-index: 1;
       }
       body {
         background-color: transparent !important;
+        overflow: hidden; /* 禁止 body 滚动，交由 #app-scroll 管理 */
+        min-height: 100dvh;
+        position: relative;
       }
       #fixed-background {
         /* 仅对必要的属性进行平滑过渡 */
         transition: background-color 0.3s ease, filter 0.3s ease;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
       }
       /* 修复 iOS 上 100vh 问题 (针对背景层) */
       @supports (-webkit-touch-callout: none) {
-        #fixed-background {
+        #app-scroll {
           height: -webkit-fill-available;
+          min-height: -webkit-fill-available;
         }
       }
     </style>
@@ -1441,7 +1425,8 @@ export async function onRequest(context) {
         randomWallpaper: ${layoutRandomWallpaper},
         wallpaperSource: "${wallpaperSource}",
         wallpaperCid360: "${wallpaperCid360}",
-        bingCountry: "${bingCountry}"
+        bingCountry: "${bingCountry}",
+        searchEngine: "${homeSearchEngineProvider}"
       };
     </script>
   `;

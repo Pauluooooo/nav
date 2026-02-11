@@ -127,13 +127,6 @@ class SearchAutocomplete {
       });
     });
 
-    document.querySelectorAll('.search-engine-option').forEach((option) => {
-      option.addEventListener('click', () => {
-        this.currentEngine = option.dataset.engine || 'local';
-        this.hideSuggestions();
-      });
-    });
-
     document.addEventListener('click', (event) => {
       if (!event.target.closest('.search-input-target-wrapper')) {
         this.hideSuggestions();
@@ -144,10 +137,14 @@ class SearchAutocomplete {
   }
 
   getCurrentEngine() {
-    if (typeof window.currentSearchEngine === 'string' && window.currentSearchEngine) {
-      return window.currentSearchEngine;
+    const configuredEngine = typeof window.currentSearchEngine === 'string' && window.currentSearchEngine
+      ? window.currentSearchEngine
+      : window.IORI_LAYOUT_CONFIG?.searchEngine;
+    const normalized = String(configuredEngine || 'local').toLowerCase();
+    if (['local', 'google', 'baidu', 'bing'].includes(normalized)) {
+      return normalized;
     }
-    return localStorage.getItem('search_engine') || 'local';
+    return 'local';
   }
 
   hideSuggestions() {
