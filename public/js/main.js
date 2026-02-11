@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 清除之前保存的外部搜索引擎选择
     localStorage.removeItem('search_engine');
   }
+  window.currentSearchEngine = currentSearchEngine;
   
   function updateSearchEngineUI(engine) {
       // Update Active Class
@@ -238,6 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
   engineOptions.forEach(option => {
       option.addEventListener('click', () => {
           currentSearchEngine = option.dataset.engine;
+          window.currentSearchEngine = currentSearchEngine;
           localStorage.setItem('search_engine', currentSearchEngine); // Save to storage
           updateSearchEngineUI(currentSearchEngine);
 

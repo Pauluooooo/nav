@@ -1,178 +1,121 @@
-/**
- * 搜索建议 API 端点
- * 代理第三方搜索引擎的建议接口（解决CORS问题）
- */
+const ALLOWED_ENGINES = new Set(['baidu', 'google', 'bing']);
+const MAX_SUGGESTIONS = 8;
 
-export async function onRequestGet({ request, env }) {
+export async function onRequestGet({ request }) {
   const url = new URL(request.url);
-  const keyword = url.searchParams.get('q');
-  const engine = url.searchParams.get('engine') || 'baidu';
+  const keyword = (url.searchParams.get('q') || '').trim();
+  const requestedEngine = (url.searchParams.get('engine') || 'baidu').toLowerCase();
+  const engine = ALLOWED_ENGINES.has(requestedEngine) ? requestedEngine : 'baidu';
 
-  // 参数验证
-  if (!keyword || keyword.trim().length === 0) {
-    return jsonResponse({ suggestions: [] });
+  if (!keyword) {
+    return jsonResponse({
+      suggestions: [],
+      engine,
+      timestamp: Date.now()
+    });
   }
 
   try {
     let suggestions = [];
 
-    switch (engine) {
-      case 'baidu':
-        suggestions = await fetchBaiduSuggestions(keyword);
-        break;
-      case 'google':
-        suggestions = await fetchGoogleSuggestions(keyword);
-        break;
-      case 'bing':
-        suggestions = await fetchBingSuggestions(keyword);
-        break;
+    if (engine === 'baidu') {
+      suggestions = await fetchBaiduSuggestions(keyword);
+    } else if (engine === 'google') {
+      suggestions = await fetchGoogleSuggestions(keyword);
+    } else if (engine === 'bing') {
+      suggestions = await fetchBingSuggestions(keyword);
     }
 
-    // 最多返回8个建议
-    const limitedSuggestions = suggestions.slice(0, 8);
-
     return jsonResponse({
-      suggestions: limitedSuggestions,
-      engine: engine,
+      suggestions: uniqueSuggestions(suggestions).slice(0, MAX_SUGGESTIONS),
+      engine,
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error(`[Search Suggestions] Error for engine ${engine}:`, error);
-    return jsonResponse(
-      {
-        suggestions: [],
-        error: error.message,
-        engine: engine
-      },
-      500
-    );
+    console.error(`[Search Suggestions] Failed for ${engine}:`, error);
+    return jsonResponse({
+      suggestions: [],
+      engine,
+      error: error.message,
+      timestamp: Date.now()
+    });
   }
 }
 
-/**
- * 获取百度搜索建议
- */
 async function fetchBaiduSuggestions(keyword) {
-  try {
-    // 使用淘宝搜索建议 API 作为备选方案（更稳定）
-    const response = await fetch(
-      `https://suggestion.taobao.com/sug?q=${encodeURIComponent(keyword)}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      }
-    );
+  const data = await fetchJson(
+    `https://www.baidu.com/sugrec?prod=pc&wd=${encodeURIComponent(keyword)}`
+  );
 
-    if (!response.ok) {
-      throw new Error(`Taobao API returned ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // 淘宝 API 返回: { "result": [[keyword, count], ...] }
-    if (data.result && Array.isArray(data.result)) {
-      return data.result.map(item => item[0]).filter(s => s && s.length > 0);
-    }
-
-    return [];
-  } catch (error) {
-    console.error('[Baidu Suggestions] Error:', error);
+  if (!data || !Array.isArray(data.g)) {
     return [];
   }
+
+  return data.g
+    .map((item) => item?.q)
+    .filter((item) => typeof item === 'string' && item.trim());
 }
 
-/**
- * 获取 Google 搜索建议
- */
 async function fetchGoogleSuggestions(keyword) {
-  try {
-    // 优先尝试 DuckDuckGo API (开放且可靠)
-    return await fetchDuckDuckGoSuggestions(keyword);
-  } catch (error) {
-    console.error('[Google Suggestions] Error:', error);
-    return [];
+  const data = await fetchJson(
+    `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(keyword)}`
+  );
+
+  if (Array.isArray(data) && Array.isArray(data[1])) {
+    return data[1].filter((item) => typeof item === 'string' && item.trim());
   }
+
+  return [];
 }
 
-/**
- * 获取 DuckDuckGo 搜索建议 (作为 Google 的备选)
- */
-async function fetchDuckDuckGoSuggestions(keyword) {
-  try {
-    const response = await fetch(
-      `https://ac.duckduckgo.com/ac/?q=${encodeURIComponent(keyword)}&type=list`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      }
-    );
-
-    if (!response.ok) return [];
-
-    const data = await response.json();
-    // DuckDuckGo API 返回 [{value: "...", type: "..."}]
-    if (Array.isArray(data)) {
-      return data
-        .filter(item => item && item.phrase)
-        .slice(0, 8)
-        .map(item => item.phrase);
-    }
-    return [];
-  } catch (error) {
-    console.error('[DuckDuckGo Suggestions] Error:', error);
-    return [];
-  }
-}
-
-/**
- * 获取 Bing 搜索建议
- */
 async function fetchBingSuggestions(keyword) {
-  try {
-    const response = await fetch(
-      `https://www.bing.com/AS/Suggestions?py=0&cvid=&bc=8&dc=0&qry=${encodeURIComponent(keyword)}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      }
-    );
+  const data = await fetchJson(
+    `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(keyword)}`
+  );
 
-    if (!response.ok) {
-      throw new Error(`Bing API returned ${response.status}`);
-    }
-
-    const text = await response.text();
-
-    // Bing 返回 JSONP 格式，需要提取 JSON
-    try {
-      const data = JSON.parse(text);
-      if (
-        data.AS &&
-        data.AS.Results &&
-        data.AS.Results[0] &&
-        data.AS.Results[0].Suggests
-      ) {
-        return data.AS.Results[0].Suggests.map(s => s.Txt).filter(
-          s => s && s.length > 0
-        );
-      }
-    } catch (parseError) {
-      console.warn('[Bing Suggestions] JSON parse failed:', parseError);
-    }
-
-    return [];
-  } catch (error) {
-    console.error('[Bing Suggestions] Error:', error);
-    return [];
+  if (Array.isArray(data) && Array.isArray(data[1])) {
+    return data[1].filter((item) => typeof item === 'string' && item.trim());
   }
+
+  return [];
 }
 
-/**
- * 返回 JSON 响应辅助函数
- */
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json, text/plain, */*'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upstream API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+function uniqueSuggestions(suggestions) {
+  const seen = new Set();
+  const result = [];
+
+  for (const item of suggestions) {
+    const value = String(item || '').trim();
+    if (!value) {
+      continue;
+    }
+
+    const key = value.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(value);
+  }
+
+  return result;
+}
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -184,10 +127,7 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-/**
- * 处理 CORS preflight 请求
- */
-export async function onRequestOptions(request) {
+export async function onRequestOptions() {
   return new Response(null, {
     headers: {
       'Access-Control-Allow-Origin': '*',

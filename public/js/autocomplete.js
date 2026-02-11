@@ -1,348 +1,363 @@
-/**
- * 搜索词联想功能 - 使用 JSONP 绕过 CORS 限制
- * 支持百度、谷歌、必应等搜索引擎的联想词
- */
-
 class SearchAutocomplete {
   constructor() {
-    this.searchInputs = document.querySelectorAll('.search-input-target');
+    this.searchInputs = Array.from(document.querySelectorAll('.search-input-target'));
     this.allBookmarks = [];
-    this.currentEngine = localStorage.getItem('search_engine') || 'local';
+    this.currentEngine = this.getCurrentEngine();
     this.debounceTimer = null;
-    this.currentKeyword = '';
+    this.requestToken = 0;
+    this.remoteCache = new Map();
+    this.MAX_CACHE_SIZE = 200;
 
-    // 防抖延迟（毫秒）
-    this.DEBOUNCE_DELAY = 300;
+    this.DEBOUNCE_DELAY = 250;
+    this.MAX_LOCAL_SUGGESTIONS = 5;
+    this.MAX_TOTAL_SUGGESTIONS = 10;
 
     this.init();
   }
 
-  /**
-   * 初始化事件监听
-   */
   init() {
-    console.log('[SearchAutocomplete] 初始化开始');
+    if (this.searchInputs.length === 0) {
+      return;
+    }
 
-    // 收集所有书签数据（本地搜索使用）
     this.collectAllBookmarks();
-    console.log(`[SearchAutocomplete] 收集到 ${this.allBookmarks.length} 个书签`);
-
-    // 为每个搜索框初始化
-    const searchWrappers = document.querySelectorAll('.search-input-target-wrapper');
-    console.log(`[SearchAutocomplete] 找到 ${searchWrappers.length} 个搜索框`);
 
     this.searchInputs.forEach((input, index) => {
       const wrapper = input.closest('.search-input-target-wrapper');
-      if (!wrapper) return;
+      if (!wrapper) {
+        return;
+      }
 
       const dropdown = wrapper.querySelector('.suggestion-dropdown');
       const list = wrapper.querySelector('.suggestion-list');
 
       if (!dropdown || !list) {
-        console.error(`[SearchAutocomplete] 搜索框${index}缺少dropdown/list元素`);
+        console.error(`[SearchAutocomplete] Missing dropdown/list for input #${index}`);
         return;
       }
 
-      // 监听输入事件
       input.addEventListener('input', () => {
         clearTimeout(this.debounceTimer);
         const keyword = input.value.trim();
 
+        this.syncInputValues(input, input.value);
+
         if (!keyword) {
-          dropdown.classList.add('hidden');
+          this.hideSuggestions();
           return;
         }
 
-        this.currentKeyword = keyword;
-        this.currentEngine = typeof currentSearchEngine !== 'undefined' ? currentSearchEngine : this.currentEngine;
-
+        this.currentEngine = this.getCurrentEngine();
         this.debounceTimer = setTimeout(() => {
           this.fetchSuggestions(keyword, dropdown, list, this.currentEngine);
         }, this.DEBOUNCE_DELAY);
       });
 
-      // 键盘导航
-      input.addEventListener('keydown', (e) => {
-        if (dropdown.classList.contains('hidden')) return;
+      input.addEventListener('keydown', (event) => {
+        if (dropdown.classList.contains('hidden')) {
+          return;
+        }
 
         const items = list.querySelectorAll('.suggestion-item');
-        if (items.length === 0) return;
+        if (items.length === 0) {
+          return;
+        }
 
-        let currentActive = list.querySelector('.suggestion-item.active');
+        const currentActive = list.querySelector('.suggestion-item.active');
         let currentIndex = currentActive ? Array.from(items).indexOf(currentActive) : -1;
 
-        switch (e.key) {
-          case 'ArrowDown':
-            e.preventDefault();
-            currentIndex = (currentIndex + 1) % items.length;
-            this.selectItem(items, currentIndex);
-            break;
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          currentIndex = (currentIndex + 1) % items.length;
+          this.selectItem(items, currentIndex);
+          return;
+        }
 
-          case 'ArrowUp':
-            e.preventDefault();
-            currentIndex = (currentIndex - 1 + items.length) % items.length;
-            this.selectItem(items, currentIndex);
-            break;
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          currentIndex = (currentIndex - 1 + items.length) % items.length;
+          this.selectItem(items, currentIndex);
+          return;
+        }
 
-          case 'Enter':
-            e.preventDefault();
-            if (currentActive) {
-              const text = currentActive.textContent.trim();
-              input.value = text;
-              dropdown.classList.add('hidden');
-            }
-            break;
+        if (event.key === 'Enter' && currentActive) {
+          event.preventDefault();
+          const value = currentActive.dataset.value || currentActive.textContent.trim();
+          this.applySuggestion(input, value);
+          return;
+        }
 
-          case 'Escape':
-            e.preventDefault();
-            dropdown.classList.add('hidden');
-            break;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          this.hideSuggestions();
         }
       });
 
-      // 失焦隐藏
       input.addEventListener('blur', () => {
-        setTimeout(() => {
-          dropdown.classList.add('hidden');
-        }, 100);
+        setTimeout(() => this.hideSuggestions(), 120);
       });
 
-      // 列表项点击
-      list.addEventListener('click', (e) => {
-        const item = e.target.closest('.suggestion-item');
-        if (item) {
-          input.value = item.textContent.trim();
-          dropdown.classList.add('hidden');
+      list.addEventListener('click', (event) => {
+        const item = event.target.closest('.suggestion-item');
+        if (!item) {
+          return;
         }
+        const value = item.dataset.value || item.textContent.trim();
+        this.applySuggestion(input, value);
       });
 
-      // 列表项悬停
-      list.addEventListener('mouseenter', (e) => {
-        const item = e.target.closest('.suggestion-item');
-        if (item) {
-          const items = list.querySelectorAll('.suggestion-item');
-          const index = Array.from(items).indexOf(item);
-          this.selectItem(items, index);
+      list.addEventListener('mousemove', (event) => {
+        const item = event.target.closest('.suggestion-item');
+        if (!item) {
+          return;
         }
-      }, true);
+        const items = list.querySelectorAll('.suggestion-item');
+        const index = Array.from(items).indexOf(item);
+        this.selectItem(items, index);
+      });
     });
 
-    // 监听搜索引擎切换
-    const engineOptions = document.querySelectorAll('.search-engine-option');
-    engineOptions.forEach(option => {
+    document.querySelectorAll('.search-engine-option').forEach((option) => {
       option.addEventListener('click', () => {
-        this.currentEngine = option.dataset.engine;
-        // 隐藏所有下拉列表
-        document.querySelectorAll('.suggestion-dropdown').forEach(d => {
-          d.classList.add('hidden');
-        });
+        this.currentEngine = option.dataset.engine || 'local';
+        this.hideSuggestions();
       });
     });
 
-    // 点击其他地方隐藏
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.search-input-target-wrapper')) {
-        document.querySelectorAll('.suggestion-dropdown').forEach(d => {
-          d.classList.add('hidden');
-        });
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.search-input-target-wrapper')) {
+        this.hideSuggestions();
       }
     });
 
-    // 暴露到全局
     window.searchAutocomplete = this;
   }
 
-  /**
-   * 选中列表项
-   */
+  getCurrentEngine() {
+    if (typeof window.currentSearchEngine === 'string' && window.currentSearchEngine) {
+      return window.currentSearchEngine;
+    }
+    return localStorage.getItem('search_engine') || 'local';
+  }
+
+  hideSuggestions() {
+    document.querySelectorAll('.suggestion-dropdown').forEach((dropdown) => {
+      dropdown.classList.add('hidden');
+    });
+  }
+
   selectItem(items, index) {
-    items.forEach(item => item.classList.remove('active'));
+    items.forEach((item) => item.classList.remove('active'));
     if (items[index]) {
       items[index].classList.add('active');
       items[index].scrollIntoView({ block: 'nearest' });
     }
   }
 
-  /**
-   * 收集所有书签
-   */
+  syncInputValues(sourceInput, value) {
+    this.searchInputs.forEach((input) => {
+      if (input !== sourceInput) {
+        input.value = value;
+      }
+    });
+  }
+
+  applySuggestion(activeInput, value) {
+    if (!value) {
+      return;
+    }
+
+    this.searchInputs.forEach((input) => {
+      input.value = value;
+    });
+    this.hideSuggestions();
+
+    if (this.getCurrentEngine() === 'local') {
+      activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
   collectAllBookmarks() {
+    const fromGlobal = Array.isArray(window.IORI_SITES)
+      ? window.IORI_SITES.map((site) => ({
+          name: site?.name || '',
+          catalog: site?.catelog_name || site?.catelog || '',
+          desc: site?.desc || ''
+        }))
+      : [];
+
+    if (fromGlobal.length > 0) {
+      this.allBookmarks = fromGlobal;
+      return;
+    }
+
     const cards = document.querySelectorAll('.site-card');
-    this.allBookmarks = Array.from(cards).map(card => ({
+    this.allBookmarks = Array.from(cards).map((card) => ({
       name: card.dataset.name || '',
       catalog: card.dataset.catalog || '',
       desc: card.dataset.desc || ''
     }));
   }
 
-  /**
-   * 生成本地建议 (基于书签)
-   */
   generateLocalSuggestions(keyword) {
-    if (!keyword) return [];
+    if (!keyword) {
+      return [];
+    }
 
     const lowerKeyword = keyword.toLowerCase();
-    const suggestions = [];
     const scored = [];
 
-    // 评分算法
-    this.allBookmarks.forEach(site => {
+    this.allBookmarks.forEach((site) => {
+      const name = String(site.name || '');
+      const catalog = String(site.catalog || '');
+      const desc = String(site.desc || '');
+      if (!name) {
+        return;
+      }
+
+      const lowerName = name.toLowerCase();
       let score = 0;
 
-      if (site.name.toLowerCase() === lowerKeyword) {
+      if (lowerName === lowerKeyword) {
         score = 100;
-      } else if (site.name.toLowerCase().startsWith(lowerKeyword)) {
-        score = 80;
-      } else if (site.name.toLowerCase().includes(lowerKeyword)) {
-        score = 60;
-      } else if (site.catalog.toLowerCase().includes(lowerKeyword)) {
+      } else if (lowerName.startsWith(lowerKeyword)) {
+        score = 90;
+      } else if (lowerName.includes(lowerKeyword)) {
+        score = 70;
+      } else if (catalog.toLowerCase().includes(lowerKeyword)) {
         score = 40;
-      } else if (site.desc.toLowerCase().includes(lowerKeyword)) {
+      } else if (desc.toLowerCase().includes(lowerKeyword)) {
         score = 20;
       }
 
       if (score > 0) {
-        scored.push({ ...site, score });
+        scored.push({ value: name, score });
       }
     });
 
-    // 排序去重
+    scored.sort((a, b) => b.score - a.score);
     const seen = new Set();
-    scored
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5)
-      .forEach(item => {
-        if (!seen.has(item.name)) {
-          seen.add(item.name);
-          suggestions.push(item.name);
-        }
-      });
+    const suggestions = [];
+
+    for (const item of scored) {
+      const key = item.value.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      suggestions.push(item.value);
+      if (suggestions.length >= this.MAX_LOCAL_SUGGESTIONS) {
+        break;
+      }
+    }
 
     return suggestions;
   }
 
-  /**
-   * 获取外部建议 (使用 JSONP)
-   */
-  fetchSuggestions(keyword, dropdown, list, engine) {
-    // 首先添加本地建议
+  async fetchSuggestions(keyword, dropdown, list, engine) {
+    const token = ++this.requestToken;
     const localSuggestions = this.generateLocalSuggestions(keyword);
 
-    // 然后获取外部建议
     if (engine === 'local') {
-      // 只显示本地建议
-      this.renderSuggestions(localSuggestions, list, 'local');
-      if (localSuggestions.length > 0) {
-        dropdown.classList.remove('hidden');
-      } else {
-        dropdown.classList.add('hidden');
+      this.renderAndToggle(localSuggestions, dropdown, list);
+      return;
+    }
+
+    const remoteSuggestions = await this.fetchRemoteSuggestions(keyword, engine);
+    if (token !== this.requestToken) {
+      return;
+    }
+
+    const merged = this.mergeSuggestions(localSuggestions, remoteSuggestions, this.MAX_TOTAL_SUGGESTIONS);
+    this.renderAndToggle(merged, dropdown, list);
+  }
+
+  async fetchRemoteSuggestions(keyword, engine) {
+    if (!keyword || !engine || engine === 'local') {
+      return [];
+    }
+
+    const cacheKey = `${engine}:${keyword.toLowerCase()}`;
+    if (this.remoteCache.has(cacheKey)) {
+      return this.remoteCache.get(cacheKey);
+    }
+
+    try {
+      const params = new URLSearchParams({
+        q: keyword,
+        engine
+      });
+      const response = await fetch(`/api/search/suggestions?${params.toString()}`, {
+        headers: { Accept: 'application/json' }
+      });
+
+      if (!response.ok) {
+        return [];
       }
-    } else if (engine === 'baidu') {
-      // 使用 JSONP 获取百度建议
-      this.fetchBaiduSuggestions(keyword, (suggestions) => {
-        const all = [...localSuggestions, ...suggestions].slice(0, 10);
-        this.renderSuggestions(all, list, 'mixed');
-        if (all.length > 0) {
-          dropdown.classList.remove('hidden');
-        } else {
-          dropdown.classList.add('hidden');
+
+      const data = await response.json();
+      const suggestions = Array.isArray(data?.suggestions)
+        ? data.suggestions
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+            .slice(0, this.MAX_TOTAL_SUGGESTIONS)
+        : [];
+
+      if (this.remoteCache.size >= this.MAX_CACHE_SIZE) {
+        const oldestKey = this.remoteCache.keys().next().value;
+        if (oldestKey) {
+          this.remoteCache.delete(oldestKey);
         }
-      });
-    } else if (engine === 'google') {
-      // 使用 JSONP 获取谷歌建议 (通过 DuckDuckGo)
-      this.fetchGoogleSuggestions(keyword, (suggestions) => {
-        const all = [...localSuggestions, ...suggestions].slice(0, 10);
-        this.renderSuggestions(all, list, 'mixed');
-        if (all.length > 0) {
-          dropdown.classList.remove('hidden');
-        } else {
-          dropdown.classList.add('hidden');
-        }
-      });
-    } else if (engine === 'bing') {
-      // Bing 搜索建议
-      this.fetchBingSuggestions(keyword, (suggestions) => {
-        const all = [...localSuggestions, ...suggestions].slice(0, 10);
-        this.renderSuggestions(all, list, 'mixed');
-        if (all.length > 0) {
-          dropdown.classList.remove('hidden');
-        } else {
-          dropdown.classList.add('hidden');
-        }
-      });
+      }
+      this.remoteCache.set(cacheKey, suggestions);
+      return suggestions;
+    } catch (error) {
+      console.warn('[SearchAutocomplete] Failed to load remote suggestions:', error);
+      return [];
     }
   }
 
-  /**
-   * 百度搜索建议 (JSONP)
-   */
-  fetchBaiduSuggestions(keyword, callback) {
-    const callbackName = 'baidu_suggest_' + Date.now();
+  mergeSuggestions(localSuggestions, remoteSuggestions, maxCount) {
+    const merged = [];
+    const seen = new Set();
+    const all = [...localSuggestions, ...remoteSuggestions];
 
-    window[callbackName] = (data) => {
-      const suggestions = (data.s || []).slice(0, 5);
-      callback(suggestions);
-      // 清理
-      delete window[callbackName];
-      const script = document.getElementById('baidu-script');
-      if (script) document.body.removeChild(script);
-    };
+    for (const item of all) {
+      const value = String(item || '').trim();
+      if (!value) {
+        continue;
+      }
+      const key = value.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      merged.push(value);
+      if (merged.length >= maxCount) {
+        break;
+      }
+    }
 
-    const script = document.createElement('script');
-    script.id = 'baidu-script';
-    script.src = `https://sp0.baidu.com/5a1Fazu8AA54nxGko9WTAnF6hhy/su?wd=${encodeURIComponent(keyword)}&cb=${callbackName}`;
-    script.onerror = () => {
-      callback([]);
-      delete window[callbackName];
-    };
-    document.body.appendChild(script);
+    return merged;
   }
 
-  /**
-   * 谷歌搜索建议 (通过 DuckDuckGo)
-   */
-  fetchGoogleSuggestions(keyword, callback) {
-    const callbackName = 'google_suggest_' + Date.now();
-
-    window[callbackName] = (data) => {
-      const suggestions = (data || [])
-        .filter(item => item && item.phrase)
-        .map(item => item.phrase)
-        .slice(0, 5);
-      callback(suggestions);
-      delete window[callbackName];
-      const script = document.getElementById('google-script');
-      if (script) document.body.removeChild(script);
-    };
-
-    // 使用 DuckDuckGo API
-    const script = document.createElement('script');
-    script.id = 'google-script';
-    script.src = `https://ac.duckduckgo.com/ac/?q=${encodeURIComponent(keyword)}&type=list&format=json&callback=${callbackName}`;
-    script.onerror = () => {
-      callback([]);
-      delete window[callbackName];
-    };
-    document.body.appendChild(script);
+  renderAndToggle(suggestions, dropdown, list) {
+    this.renderSuggestions(suggestions, list);
+    if (suggestions.length > 0) {
+      this.hideSuggestions();
+      dropdown.classList.remove('hidden');
+    } else {
+      dropdown.classList.add('hidden');
+    }
   }
 
-  /**
-   * 必应搜索建议 (JSONP)
-   */
-  fetchBingSuggestions(keyword, callback) {
-    // Bing 一般不支持 JSONP，使用百度作为备选
-    this.fetchBaiduSuggestions(keyword, callback);
-  }
-
-  /**
-   * 渲染建议列表
-   */
-  renderSuggestions(suggestions, list, type) {
+  renderSuggestions(suggestions, list) {
     list.innerHTML = '';
 
-    suggestions.forEach((suggestion, index) => {
+    suggestions.forEach((suggestion) => {
       const li = document.createElement('li');
       li.className = 'suggestion-item';
+      li.dataset.value = suggestion;
       li.innerHTML = `
         <div class="suggestion-content">
           <svg class="suggestion-icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -359,25 +374,19 @@ class SearchAutocomplete {
   }
 }
 
-/**
- * HTML 转义
- */
 function escapeHTML(str) {
-  if (!str) return '';
+  if (!str) {
+    return '';
+  }
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
 }
 
-/**
- * 初始化
- */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    console.log('[SearchAutocomplete] DOM已加载，开始初始化');
     new SearchAutocomplete();
   });
 } else {
-  console.log('[SearchAutocomplete] 页面已加载，立即初始化');
   new SearchAutocomplete();
 }
