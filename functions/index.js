@@ -1067,6 +1067,12 @@ export async function onRequest(context) {
   const submissionEnabled = String(env.ENABLE_PUBLIC_SUBMISSION) === 'true';
   const submissionClass = submissionEnabled ? '' : 'hidden';
 
+  // Defaults for template placeholders.
+  const siteName = homeSiteName || env.SITE_NAME || 'Iori Nav';
+  const siteDescription = homeSiteDescription || env.SITE_DESCRIPTION || 'Bookmarks navigation';
+  const footerText = env.FOOTER_TEXT || 'Iori Nav';
+  const hitokotoContent = homeHideHitokoto ? '' : '...';
+
   // Build Style Strings
   const getStyleStr = (size, color, font) => {
     let s = '';
