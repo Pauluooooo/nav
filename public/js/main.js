@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
       baidu: '百度搜索...',
       bing: 'Bing 搜索...'
   };
+  let currentSearchKeyword = '';
   const searchPlaceholder = searchPlaceholderMap[currentSearchEngine] || searchPlaceholderMap.local;
   searchInputs.forEach((input) => {
       input.placeholder = searchPlaceholder;
@@ -209,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
   searchInputs.forEach(input => {
     // Search Input Handler (always filters local cards)
     input.addEventListener('input', function() {
-        const keyword = this.value.toLowerCase().trim();
+        currentSearchKeyword = this.value.trim();
         // Sync other inputs
         searchInputs.forEach(otherInput => {
             if (otherInput !== this) {
@@ -217,22 +218,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        const cards = sitesGrid?.querySelectorAll('.site-card');
-        
-        cards?.forEach(card => {
-        const name = (card.dataset.name || '').toLowerCase();
-        const url = (card.dataset.url || '').toLowerCase();
-        const catalog = (card.dataset.catalog || '').toLowerCase();
-        const desc = (card.dataset.desc || '').toLowerCase();
-        
-        if (name.includes(keyword) || url.includes(keyword) || catalog.includes(keyword) || desc.includes(keyword)) {
-            card.classList.remove('hidden');
-        } else {
-            card.classList.add('hidden');
-        }
-        });
-        
-        updateHeading(keyword);
+        const visibleCount = filterVisibleCards(currentSearchKeyword);
+        updateHeading(currentSearchKeyword, undefined, visibleCount);
     });
 
     // External Search Enter Handler
@@ -254,6 +241,31 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
+  function updateGroupVisibility() {
+    const groups = sitesGrid?.querySelectorAll('.bookmark-group');
+    groups?.forEach(group => {
+      const visibleCards = group.querySelectorAll('.site-card:not(.hidden)').length;
+      group.classList.toggle('hidden', visibleCards === 0);
+    });
+  }
+
+  function filterVisibleCards(keyword) {
+    const normalized = String(keyword || '').toLowerCase().trim();
+    const cards = sitesGrid?.querySelectorAll('.site-card');
+
+    cards?.forEach(card => {
+      const name = (card.dataset.name || '').toLowerCase();
+      const url = (card.dataset.url || '').toLowerCase();
+      const catalog = (card.dataset.catalog || '').toLowerCase();
+      const desc = (card.dataset.desc || '').toLowerCase();
+      const matched = !normalized || name.includes(normalized) || url.includes(normalized) || catalog.includes(normalized) || desc.includes(normalized);
+      card.classList.toggle('hidden', !matched);
+    });
+
+    updateGroupVisibility();
+    return sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
+  }
+
   function updateHeading(keyword, activeCatalog, count) {
     const heading = document.querySelector('[data-role="list-heading"]');
     if (!heading) return;
@@ -289,6 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // 初次加载时根据屏幕宽度修正标题显示
   updateHeading();
+  groupRenderedCards();
   
   // ========== 一言 API ==========
   const hitokotoContainer = document.querySelector('#hitokoto').parentElement;
@@ -498,7 +511,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         renderSites(filteredSites);
-        updateHeading(null, catalogId ? catalogName : null, filteredSites.length);
+        const visibleCount = sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
+        updateHeading(currentSearchKeyword, catalogId ? catalogName : null, visibleCount);
         updateNavigationState(catalogId);
 
         // Remember Last Category Logic
@@ -527,6 +541,293 @@ document.addEventListener('DOMContentLoaded', function() {
           expires = "; expires=" + date.toUTCString();
       }
       document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
+  }
+
+  function getCategoryOrderMap() {
+      const orderMap = new Map();
+      let order = 0;
+      document.querySelectorAll('#horizontalCategoryNav a[data-id], #sidebar a[data-id]').forEach(link => {
+          const id = String(link.getAttribute('data-id') || '').trim();
+          if (!id || orderMap.has(id)) return;
+          orderMap.set(id, order++);
+      });
+      return orderMap;
+  }
+
+  function findCatalogIdByName(name) {
+      const normalizedName = String(name || '').trim();
+      if (!normalizedName) return '';
+      const links = document.querySelectorAll('#horizontalCategoryNav a[data-id], #sidebar a[data-id], a[data-id]');
+      for (const link of links) {
+          const text = String(link.textContent || '').replace(/\s+/g, ' ').trim();
+          if (text === normalizedName) {
+              return String(link.getAttribute('data-id') || '');
+          }
+      }
+      return '';
+  }
+
+  function getGroupStorageKey(groupName) {
+      const catalogId = findCatalogIdByName(groupName);
+      const key = catalogId || String(groupName || '').toLowerCase();
+      return `iori_group_sort_${encodeURIComponent(key)}`;
+  }
+
+  function loadGroupSortOrder(groupName) {
+      const raw = localStorage.getItem(getGroupStorageKey(groupName));
+      if (!raw) return [];
+      try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed.map(id => String(id)) : [];
+      } catch (_error) {
+          return [];
+      }
+  }
+
+  function applyGroupSortOrder(groupName, cards) {
+      const orderList = loadGroupSortOrder(groupName);
+      if (!orderList.length) return cards;
+      const orderIndex = new Map(orderList.map((id, index) => [String(id), index]));
+      return [...cards].sort((a, b) => {
+          const aId = String(a.getAttribute('data-id') || '');
+          const bId = String(b.getAttribute('data-id') || '');
+          const aRank = orderIndex.has(aId) ? orderIndex.get(aId) : Number.MAX_SAFE_INTEGER;
+          const bRank = orderIndex.has(bId) ? orderIndex.get(bId) : Number.MAX_SAFE_INTEGER;
+          if (aRank !== bRank) return aRank - bRank;
+          return 0;
+      });
+  }
+
+  function saveGroupSortOrder(groupName, groupGrid) {
+      if (!groupGrid) return;
+      const ids = Array.from(groupGrid.querySelectorAll('.site-card'))
+          .map(card => card.getAttribute('data-id'))
+          .filter(Boolean);
+      localStorage.setItem(getGroupStorageKey(groupName), JSON.stringify(ids));
+  }
+
+  function getGroupGridClass(gridCols) {
+      const value = String(gridCols || '4');
+      if (value === '5') return 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 justify-items-center';
+      if (value === '6') return 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 min-[1200px]:grid-cols-6 gap-3 sm:gap-6 justify-items-center';
+      if (value === '7') return 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-6 justify-items-center';
+      return 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 justify-items-center';
+  }
+
+  function setupGroupSorting(groupGrid, groupName) {
+      let draggedItem = null;
+
+      groupGrid.addEventListener('dragstart', (event) => {
+          const card = event.target.closest('.site-card');
+          if (!card || card.parentElement !== groupGrid) return;
+          draggedItem = card;
+          draggedItem.classList.add('dragging');
+          document.body.classList.add('drag-sorting');
+          if (event.dataTransfer) {
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', draggedItem.getAttribute('data-id') || '');
+          }
+      });
+
+      groupGrid.addEventListener('dragover', (event) => {
+          if (!draggedItem) return;
+          event.preventDefault();
+          const target = event.target.closest('.site-card');
+          if (!target || target === draggedItem || target.parentElement !== groupGrid) return;
+          const rect = target.getBoundingClientRect();
+          const placeAfter = event.clientY > rect.top + rect.height / 2;
+          if (placeAfter) target.after(draggedItem);
+          else target.before(draggedItem);
+      });
+
+      groupGrid.addEventListener('dragend', () => {
+          if (!draggedItem) return;
+          draggedItem.classList.remove('dragging');
+          draggedItem = null;
+          document.body.classList.remove('drag-sorting');
+          saveGroupSortOrder(groupName, groupGrid);
+      });
+
+      // Touch sorting (mobile)
+      const HOLD_DELAY = 220;
+      const CANCEL_DISTANCE = 10;
+      let holdTimer = null;
+      let dragCard = null;
+      let dragGhost = null;
+      let startX = 0;
+      let startY = 0;
+      let offsetX = 0;
+      let offsetY = 0;
+      let suppressClick = false;
+
+      const clearHoldTimer = () => {
+          if (!holdTimer) return;
+          clearTimeout(holdTimer);
+          holdTimer = null;
+      };
+
+      const moveGhost = (x, y) => {
+          if (!dragGhost) return;
+          dragGhost.style.left = `${x - offsetX}px`;
+          dragGhost.style.top = `${y - offsetY}px`;
+      };
+
+      const finishTouchDrag = () => {
+          if (!dragCard) return;
+          dragCard.style.visibility = '';
+          dragCard.classList.remove('touch-sort-origin');
+          dragCard = null;
+          if (dragGhost) {
+              dragGhost.remove();
+              dragGhost = null;
+          }
+          document.body.classList.remove('drag-sorting');
+          saveGroupSortOrder(groupName, groupGrid);
+      };
+
+      groupGrid.addEventListener('touchstart', (event) => {
+          if (event.touches.length !== 1) return;
+          const card = event.target.closest('.site-card');
+          if (!card || card.parentElement !== groupGrid) return;
+          const touch = event.touches[0];
+          startX = touch.clientX;
+          startY = touch.clientY;
+          clearHoldTimer();
+          holdTimer = setTimeout(() => {
+              dragCard = card;
+              suppressClick = true;
+              const rect = card.getBoundingClientRect();
+              offsetX = touch.clientX - rect.left;
+              offsetY = touch.clientY - rect.top;
+              dragGhost = card.cloneNode(true);
+              dragGhost.classList.add('touch-drag-ghost');
+              dragGhost.style.width = `${rect.width}px`;
+              dragGhost.style.height = `${rect.height}px`;
+              moveGhost(touch.clientX, touch.clientY);
+              document.body.appendChild(dragGhost);
+              card.style.visibility = 'hidden';
+              card.classList.add('touch-sort-origin');
+              document.body.classList.add('drag-sorting');
+          }, HOLD_DELAY);
+      }, { passive: true });
+
+      groupGrid.addEventListener('touchmove', (event) => {
+          const touch = event.touches[0];
+          if (!touch) return;
+
+          if (!dragCard) {
+              if (holdTimer) {
+                  const movedX = Math.abs(touch.clientX - startX);
+                  const movedY = Math.abs(touch.clientY - startY);
+                  if (movedX > CANCEL_DISTANCE || movedY > CANCEL_DISTANCE) clearHoldTimer();
+              }
+              return;
+          }
+
+          event.preventDefault();
+          moveGhost(touch.clientX, touch.clientY);
+          const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.site-card');
+          if (!target || target === dragCard || target.parentElement !== groupGrid) return;
+          const rect = target.getBoundingClientRect();
+          const placeAfter = touch.clientY > rect.top + rect.height / 2;
+          if (placeAfter) target.after(dragCard);
+          else target.before(dragCard);
+      }, { passive: false });
+
+      groupGrid.addEventListener('touchend', () => {
+          clearHoldTimer();
+          finishTouchDrag();
+      }, { passive: true });
+
+      groupGrid.addEventListener('touchcancel', () => {
+          clearHoldTimer();
+          finishTouchDrag();
+      }, { passive: true });
+
+      groupGrid.addEventListener('click', (event) => {
+          if (!suppressClick) return;
+          event.preventDefault();
+          event.stopPropagation();
+          suppressClick = false;
+      }, true);
+  }
+
+  function groupRenderedCards() {
+      if (!sitesGrid) return;
+      const cards = Array.from(sitesGrid.querySelectorAll(':scope > .site-card'));
+      if (!cards.length) {
+          updateGroupVisibility();
+          return;
+      }
+
+      sitesGrid.classList.remove(
+          'grid',
+          'grid-cols-1',
+          'grid-cols-2',
+          'sm:grid-cols-2',
+          'md:grid-cols-3',
+          'lg:grid-cols-3',
+          'lg:grid-cols-4',
+          'lg:grid-cols-5',
+          'xl:grid-cols-4',
+          'xl:grid-cols-7',
+          'min-[1200px]:grid-cols-6',
+          'gap-3',
+          'gap-4',
+          'sm:gap-6',
+          'justify-items-center'
+      );
+      sitesGrid.classList.add('sites-grid-grouped');
+      sitesGrid.innerHTML = '';
+
+      const grouped = new Map();
+      cards.forEach(card => {
+          const groupName = String(card.dataset.catalog || '未分类').trim() || '未分类';
+          if (!grouped.has(groupName)) grouped.set(groupName, []);
+          grouped.get(groupName).push(card);
+      });
+
+      const categoryOrderMap = getCategoryOrderMap();
+      const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
+          const aId = findCatalogIdByName(a[0]);
+          const bId = findCatalogIdByName(b[0]);
+          const aOrder = aId && categoryOrderMap.has(aId) ? categoryOrderMap.get(aId) : Number.MAX_SAFE_INTEGER;
+          const bOrder = bId && categoryOrderMap.has(bId) ? categoryOrderMap.get(bId) : Number.MAX_SAFE_INTEGER;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return String(a[0]).localeCompare(String(b[0]), 'zh-Hans-CN');
+      });
+
+      sortedGroups.forEach(([groupName, groupCards]) => {
+          const orderedCards = applyStoredGroupOrder(groupName, groupCards);
+          const section = document.createElement('section');
+          section.className = 'bookmark-group';
+
+          section.innerHTML = `
+            <div class="bookmark-group-header">
+              <div class="bookmark-group-title">
+                <svg xmlns="http://www.w3.org/2000/svg" class="bookmark-group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1H3V7zM3 10h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7z" />
+                </svg>
+                <span class="bookmark-group-name">${escapeHTML(groupName)}</span>
+                <span class="bookmark-group-count">${orderedCards.length}</span>
+              </div>
+              <span class="bookmark-group-sort-hint">拖动排序</span>
+            </div>
+          `;
+
+          const groupGrid = document.createElement('div');
+          groupGrid.className = `${getGroupGridClass(layoutConfig.gridCols)} group-sites-grid`;
+
+          orderedCards.forEach(card => {
+              card.classList.remove('hidden');
+              card.draggable = true;
+              groupGrid.appendChild(card);
+          });
+
+          section.appendChild(groupGrid);
+          sitesGrid.appendChild(section);
+          setupGroupSorting(groupGrid, groupName);
+      });
   }
 
   function renderSites(sites) {
@@ -611,6 +912,7 @@ document.addEventListener('DOMContentLoaded', function() {
         card.setAttribute('data-url', safeUrl);
         card.setAttribute('data-catalog', safeCatalog);
         card.setAttribute('data-desc', safeDesc);
+        card.setAttribute('data-id', String(site.id || ''));
         
         card.innerHTML = `
         <div class="site-card-content">
@@ -654,6 +956,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
       });
+      groupRenderedCards();
+      filterVisibleCards(currentSearchKeyword);
   }
 
   function updateNavigationState(catalogId) {
@@ -783,7 +1087,8 @@ document.addEventListener('DOMContentLoaded', function() {
                   // Explicitly restore "All Categories" state
                   const allSites = window.IORI_SITES || [];
                   renderSites(allSites);
-                  updateHeading(null, null, allSites.length);
+                  const visibleCount = sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
+                  updateHeading(currentSearchKeyword, null, visibleCount);
                   updateNavigationState(null);
                   return;
               }
@@ -792,18 +1097,14 @@ document.addEventListener('DOMContentLoaded', function() {
               const link = document.querySelector(`a[data-id="${lastId}"]`);
               
               if (link) {
-                  const href = link.getAttribute('href');
-                  // Clone logic from click handler
-                  // Note: link.textContent might contain garbage if it has icons.
-                  // But updateHeading handles it? No, we should be careful.
-                  // main.js click handler uses: let catalogName = link.textContent.trim();
                   let catalogName = link.innerText.trim(); 
                   
                   const allSites = window.IORI_SITES || [];
                   const filteredSites = allSites.filter(site => String(site.catelog_id) === String(lastId));
                   
                   renderSites(filteredSites);
-                  updateHeading(null, catalogName, filteredSites.length);
+                  const visibleCount = sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
+                  updateHeading(currentSearchKeyword, catalogName, visibleCount);
                   updateNavigationState(lastId);
               } else {
                   localStorage.removeItem('iori_last_category');
@@ -812,31 +1113,72 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   })();
 
-  // Theme Toggle Logic
+  // Theme Toggle + Time Auto Mode
   const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const THEME_AUTO_DARK_START = 19;
+  const THEME_AUTO_DARK_END = 7;
+
+  function getThemeMode() {
+      return localStorage.getItem('theme_mode') || 'auto';
+  }
+
+  function getAutoTheme() {
+      const hour = new Date().getHours();
+      return (hour >= THEME_AUTO_DARK_START || hour < THEME_AUTO_DARK_END) ? 'dark' : 'light';
+  }
+
+  function resolveTheme() {
+      if (getThemeMode() === 'auto') {
+          return getAutoTheme();
+      }
+      return localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+  }
+
+  function applyTheme(theme) {
+      if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+      } else {
+          document.documentElement.classList.remove('dark');
+      }
+      document.documentElement.dataset.themeMode = getThemeMode();
+  }
+
+  function applyResolvedTheme() {
+      applyTheme(resolveTheme());
+  }
+
+  applyResolvedTheme();
+  setInterval(() => {
+      if (getThemeMode() === 'auto') {
+          applyResolvedTheme();
+      }
+  }, 60000);
+
+  document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && getThemeMode() === 'auto') {
+          applyResolvedTheme();
+      }
+  });
+
   if (themeToggleBtn) {
+      themeToggleBtn.title = '切换主题（双击恢复自动）';
+
       themeToggleBtn.addEventListener('click', () => {
           const isDark = document.documentElement.classList.contains('dark');
           const nextState = isDark ? 'light' : 'dark';
 
           const updateTheme = () => {
-              if (nextState === 'dark') {
-                  document.documentElement.classList.add('dark');
-              } else {
-                  document.documentElement.classList.remove('dark');
-              }
+              localStorage.setItem('theme_mode', 'manual');
               localStorage.setItem('theme', nextState);
+              applyTheme(nextState);
           };
 
-          // Fallback for browsers without View Transitions
           if (!document.startViewTransition) {
               updateTheme();
               return;
           }
 
-          // Add class for custom transition CSS
           document.documentElement.classList.add('theme-animating');
-
           const transition = document.startViewTransition(() => {
               updateTheme();
           });
@@ -844,6 +1186,13 @@ document.addEventListener('DOMContentLoaded', function() {
           transition.finished.finally(() => {
               document.documentElement.classList.remove('theme-animating');
           });
+      });
+
+      themeToggleBtn.addEventListener('dblclick', (event) => {
+          event.preventDefault();
+          localStorage.setItem('theme_mode', 'auto');
+          applyResolvedTheme();
+          showToast('已恢复自动主题模式');
       });
   }
 

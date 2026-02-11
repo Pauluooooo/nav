@@ -516,10 +516,6 @@ class SearchAutocomplete {
              <circle cx="11" cy="11" r="8"></circle>
              <path d="m21 21-4.35-4.35"></path>
            </svg>`;
-      const bookmarkMeta = isBookmark && normalized.catalog
-        ? `<div class="suggestion-meta"><span class="suggestion-category">${escapeHTML(normalized.catalog)}</span></div>`
-        : '';
-
       const li = document.createElement('li');
       li.className = 'suggestion-item';
       li.dataset.value = normalized.value;
@@ -535,7 +531,6 @@ class SearchAutocomplete {
               <div class="suggestion-title">${escapeHTML(normalized.value)}</div>
               <span class="suggestion-tag ${tagClass}">${tagText}</span>
             </div>
-            ${bookmarkMeta}
           </div>
         </div>
       `;

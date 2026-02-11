@@ -5,12 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{SITE_NAME}} - 网址导航</title>
   <link rel="icon" href="/favicon.svg?v=148aafdf" type="image/svg+xml">
-  <link rel="stylesheet" href="/css/style.css?v=f8cf793e">
+  <link rel="stylesheet" href="/css/style.css?v=bb14fa79">
   <script>
     // Init Theme ASAP to prevent FOUC
-    if (localStorage.getItem('theme') === 'dark') {
-      document.documentElement.classList.add('dark');
-    }
+    (function () {
+      const getMode = () => localStorage.getItem('theme_mode') || 'auto';
+      const getAutoTheme = () => {
+        const hour = new Date().getHours();
+        return (hour >= 19 || hour < 7) ? 'dark' : 'light';
+      };
+      const mode = getMode();
+      const theme = mode === 'auto'
+        ? getAutoTheme()
+        : (localStorage.getItem('theme') === 'dark' ? 'dark' : 'light');
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      document.documentElement.dataset.themeMode = mode;
+    })();
   </script>
   <link rel="stylesheet" href="/css/tailwind.min.css?v=e5bbfa15">
 </head>
@@ -186,7 +200,7 @@
     </div>
   </div>
   
-  <script src="/js/autocomplete.js?v=3a982e1c"></script>
-  <script src="/js/main.js?v=acb2b5ef"></script>
+  <script src="/js/autocomplete.js?v=055c686b"></script>
+  <script src="/js/main.js?v=80c8dea0"></script>
 </body>
 </html>

@@ -1074,3 +1074,118 @@ html:not(.dark) .dropdown-item.active {
     font-size: 0.7rem;
   }
 }
+
+/* ========== Grouped Bookmark Layout ========== */
+.sites-grid-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bookmark-group {
+  width: 100%;
+}
+
+.bookmark-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  padding: 0 0.15rem;
+}
+
+.bookmark-group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.bookmark-group-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.bookmark-group-name {
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookmark-group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 9999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.bookmark-group-sort-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.group-sites-grid {
+  width: 100%;
+}
+
+.group-sites-grid .site-card {
+  width: 100%;
+  cursor: grab;
+}
+
+.group-sites-grid .site-card.dragging {
+  opacity: 0.45;
+  transform: scale(0.98) !important;
+}
+
+body.drag-sorting .site-card:hover {
+  transform: none !important;
+  z-index: 1 !important;
+}
+
+.touch-drag-ghost {
+  position: fixed !important;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.92;
+  transform: scale(1.02);
+}
+
+.touch-sort-origin {
+  opacity: 0.35;
+}
+
+.dark .bookmark-group-name {
+  color: #e5e7eb;
+}
+
+.dark .bookmark-group-count {
+  background: rgba(37, 99, 235, 0.32);
+  color: #bfdbfe;
+}
+
+.dark .bookmark-group-sort-hint {
+  color: #9ca3af;
+}
+
+/* ========== Suggestion Alignment ========== */
+.suggestion-title-row {
+  justify-content: space-between;
+}
+
+.suggestion-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
