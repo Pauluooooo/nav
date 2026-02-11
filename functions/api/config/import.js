@@ -46,6 +46,12 @@ export async function onRequestPost(context) {
     // 在导入过程中的 SELECT ... WHERE IN (...) 查询中，
     // 将分块大小设为 50 以确保绝对安全且不影响效率。
     const BATCH_SIZE = 50;
+    const parsePrivacyFlag = (value) => {
+        if (typeof value === 'boolean') return value ? 1 : 0;
+        if (typeof value === 'number') return value === 1 ? 1 : 0;
+        const normalized = String(value ?? '').trim().toLowerCase();
+        return ['1', 'true', 'yes', 'on'].includes(normalized) ? 1 : 0;
+    };
 
     // --- Category Processing ---
     const oldCatIdToNewCatIdMap = new Map(); // Maps JSON ID -> DB ID
@@ -105,7 +111,7 @@ export async function onRequestPost(context) {
         for (const cat of categoriesToImport) {
             const catName = (cat.catelog || '').trim();
             const jsonParentId = cat.parent_id || 0;
-            const isPrivate = cat.is_private ? 1 : 0; // Import privacy setting
+            const isPrivate = parsePrivacyFlag(cat.is_private); // Import privacy setting
             
             let dbParentId = 0;
             if (jsonParentId !== 0) {
@@ -164,6 +170,29 @@ export async function onRequestPost(context) {
         }
     }
 
+    // Ensure root-level bookmarks (catelog_id = 0) can be imported.
+    let rootFallbackCategoryId = 0;
+    if (isNewFormat && sitesToImport.some(site => Number(site?.catelog_id || 0) === 0)) {
+        const rootCandidates = ['未分类', 'Default'];
+        let rootCategory = existingDbCategories.find(c => {
+            const catName = String(c?.catelog || '').trim();
+            const parentId = Number(c?.parent_id || 0);
+            return rootCandidates.includes(catName) && parentId === 0;
+        });
+
+        if (!rootCategory) {
+            const result = await db.prepare(
+                'INSERT INTO category (catelog, sort_order, parent_id, is_private) VALUES (?, ?, ?, ?)'
+            ).bind('未分类', 9999, 0, 0).run();
+            rootCategory = { id: result.meta.last_row_id, catelog: '未分类', parent_id: 0, is_private: 0 };
+            existingDbCategories.push(rootCategory);
+        }
+
+        rootFallbackCategoryId = Number(rootCategory.id);
+        oldCatIdToNewCatIdMap.set(0, rootFallbackCategoryId);
+        oldCatIdToNewCatIdMap.set('0', rootFallbackCategoryId);
+    }
+
     // --- Site Processing ---
     const siteUrls = sitesToImport.map(item => (item.url || '').trim()).filter(url => url);
     const existingSiteUrls = new Set();
@@ -208,11 +237,23 @@ export async function onRequestPost(context) {
         let catIsPrivate = 0;
 
         if (isNewFormat) {
-            newCatId = oldCatIdToNewCatIdMap.get(site.catelog_id);
-            const catObj = existingDbCategories.find(c => c.id === newCatId);
+            const sourceCatId = site.catelog_id ?? 0;
+            const normalizedSourceCatId = Number(sourceCatId || 0);
+            newCatId = oldCatIdToNewCatIdMap.get(sourceCatId);
+            if (!newCatId && oldCatIdToNewCatIdMap.has(normalizedSourceCatId)) {
+                newCatId = oldCatIdToNewCatIdMap.get(normalizedSourceCatId);
+            }
+            if (!newCatId && normalizedSourceCatId === 0 && rootFallbackCategoryId) {
+                newCatId = rootFallbackCategoryId;
+            }
+            if (!newCatId && site.catelog_name) {
+                const mappedByName = existingDbCategories.find(c => String(c.catelog || '').trim() === String(site.catelog_name || '').trim());
+                if (mappedByName) newCatId = mappedByName.id;
+            }
+            const catObj = existingDbCategories.find(c => Number(c.id) === Number(newCatId));
             if (catObj) {
                 catNameForDb = catObj.catelog;
-                catIsPrivate = catObj.is_private || 0;
+                catIsPrivate = parsePrivacyFlag(catObj.is_private);
             }
         } else {
             const catName = (site.catelog || 'Default').trim();
@@ -220,8 +261,8 @@ export async function onRequestPost(context) {
             catNameForDb = catName;
             const catObj = existingDbCategories.find(c => c.id === newCatId);
              if (catObj) {
-                catIsPrivate = catObj.is_private || 0;
-            }
+                catIsPrivate = parsePrivacyFlag(catObj.is_private);
+             }
         }
 
         if (!newCatId) {
@@ -240,7 +281,7 @@ export async function onRequestPost(context) {
         const sortOrderValue = normalizeSortOrder(site.sort_order);
         
         // Handle Privacy Logic
-        let finalIsPrivate = site.is_private ? 1 : 0;
+        let finalIsPrivate = parsePrivacyFlag(site.is_private);
         // Force private if category is private
         if (catIsPrivate === 1) {
             finalIsPrivate = 1;

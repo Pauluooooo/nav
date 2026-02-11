@@ -777,8 +777,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       const config = window.IORI_LAYOUT_CONFIG || {};
       const groupedGridClass = getGroupGridClass(config.gridCols);
-
-      sitesGrid.classList.remove(
+      const removableGridTokens = [
           'grid',
           'grid-cols-1',
           'grid-cols-2',
@@ -793,8 +792,24 @@ document.addEventListener('DOMContentLoaded', function() {
           'gap-3',
           'gap-4',
           'sm:gap-6',
-          'justify-items-center'
-      );
+          'justify-items-center',
+          'sites-grid-grouped'
+      ];
+
+      const fallbackFlatLayout = () => {
+          sitesGrid.classList.remove(...removableGridTokens);
+          groupedGridClass.split(' ').filter(Boolean).forEach(token => sitesGrid.classList.add(token));
+          sitesGrid.innerHTML = '';
+          cards.forEach(card => {
+              card.classList.remove('hidden', 'dragging', 'touch-sort-origin');
+              card.draggable = false;
+              sitesGrid.appendChild(card);
+          });
+      };
+
+      try {
+
+      sitesGrid.classList.remove(...removableGridTokens);
       sitesGrid.classList.add('sites-grid-grouped');
       sitesGrid.innerHTML = '';
 
@@ -846,6 +861,10 @@ document.addEventListener('DOMContentLoaded', function() {
           sitesGrid.appendChild(section);
           setupGroupSorting(groupGrid, groupName);
       });
+      } catch (error) {
+          console.error('[groupRenderedCards] fallback to flat layout:', error);
+          fallbackFlatLayout();
+      }
   }
 
   function renderSites(sites) {
