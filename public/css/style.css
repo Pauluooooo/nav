@@ -926,12 +926,40 @@ html:not(.dark) .dropdown-item.active {
 }
 
 .suggestion-title {
+  flex: 1;
+  min-width: 0;
   font-size: 0.875rem;
   font-weight: 500;
   color: #1f2937;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.suggestion-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.suggestion-tag {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+.suggestion-tag-bookmark {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.suggestion-tag-query {
+  background-color: #e0f2fe;
+  color: #075985;
 }
 
 .suggestion-meta {
@@ -952,6 +980,10 @@ html:not(.dark) .dropdown-item.active {
 .suggestion-source {
   font-style: italic;
   color: #9ca3af;
+}
+
+.suggestion-icon-bookmark {
+  color: #16a34a;
 }
 
 .suggestion-engine {
@@ -990,6 +1022,20 @@ html:not(.dark) .dropdown-item.active {
   color: #9ca3af;
 }
 
+.dark .suggestion-tag-bookmark {
+  background-color: rgba(22, 101, 52, 0.35);
+  color: #bbf7d0;
+}
+
+.dark .suggestion-tag-query {
+  background-color: rgba(7, 89, 133, 0.35);
+  color: #bae6fd;
+}
+
+.dark .suggestion-icon-bookmark {
+  color: #4ade80;
+}
+
 .dark .suggestion-engine {
   color: #9ca3af;
 }
@@ -1013,6 +1059,11 @@ html:not(.dark) .dropdown-item.active {
 
   .suggestion-title {
     font-size: 0.8125rem;
+  }
+
+  .suggestion-tag {
+    font-size: 0.625rem;
+    padding: 0.15rem 0.35rem;
   }
 
   .suggestion-meta {

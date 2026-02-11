@@ -83,9 +83,9 @@ class SearchAutocomplete {
 
         if (event.key === 'Enter' && currentActive) {
           event.preventDefault();
-          const value = currentActive.dataset.value || currentActive.textContent.trim();
+          const suggestion = this.readSuggestionFromItem(currentActive);
           const submitSearch = this.getCurrentEngine() !== 'local';
-          this.applySuggestion(input, value, { submitSearch });
+          this.applySuggestion(input, suggestion, { submitSearch });
           return;
         }
 
@@ -111,9 +111,9 @@ class SearchAutocomplete {
         if (!item) {
           return;
         }
-        const value = item.dataset.value || item.textContent.trim();
+        const suggestion = this.readSuggestionFromItem(item);
         const submitSearch = this.getCurrentEngine() !== 'local';
-        this.applySuggestion(input, value, { submitSearch });
+        this.applySuggestion(input, suggestion, { submitSearch });
       });
 
       list.addEventListener('mousemove', (event) => {
@@ -169,7 +169,70 @@ class SearchAutocomplete {
     });
   }
 
-  applySuggestion(activeInput, value, options = {}) {
+  readSuggestionFromItem(item) {
+    if (!item) {
+      return null;
+    }
+
+    return {
+      value: item.dataset.value || item.textContent.trim(),
+      type: item.dataset.type || 'query',
+      url: item.dataset.url || '',
+      catalog: item.dataset.catalog || '',
+      engine: item.dataset.engine || ''
+    };
+  }
+
+  normalizeSuggestion(suggestion, fallbackType = 'query', fallbackEngine = '') {
+    if (typeof suggestion === 'string') {
+      const value = suggestion.trim();
+      return value
+        ? { value, type: fallbackType, url: '', catalog: '', engine: fallbackEngine }
+        : null;
+    }
+
+    if (!suggestion || typeof suggestion !== 'object') {
+      return null;
+    }
+
+    const value = String(suggestion.value || '').trim();
+    if (!value) {
+      return null;
+    }
+
+    const normalizedType = suggestion.type === 'bookmark' ? 'bookmark' : fallbackType;
+    return {
+      value,
+      type: normalizedType,
+      url: String(suggestion.url || '').trim(),
+      catalog: String(suggestion.catalog || '').trim(),
+      engine: String(suggestion.engine || fallbackEngine || '').trim()
+    };
+  }
+
+  isSafeHttpUrl(url) {
+    const normalized = String(url || '').trim();
+    if (!normalized) {
+      return false;
+    }
+    try {
+      const parsed = new URL(normalized);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  openBookmark(url) {
+    if (!this.isSafeHttpUrl(url)) {
+      return;
+    }
+    window.open(url, '_blank');
+  }
+
+  applySuggestion(activeInput, suggestion, options = {}) {
+    const normalizedSuggestion = this.normalizeSuggestion(suggestion, 'query');
+    const value = normalizedSuggestion?.value || '';
     if (!value) {
       return;
     }
@@ -178,6 +241,11 @@ class SearchAutocomplete {
       input.value = value;
     });
     this.hideSuggestions();
+
+    if (normalizedSuggestion?.type === 'bookmark' && this.isSafeHttpUrl(normalizedSuggestion.url)) {
+      this.openBookmark(normalizedSuggestion.url);
+      return;
+    }
 
     const engine = this.getCurrentEngine();
     if (engine === 'local') {
@@ -194,6 +262,7 @@ class SearchAutocomplete {
     const fromGlobal = Array.isArray(window.IORI_SITES)
       ? window.IORI_SITES.map((site) => ({
           name: site?.name || '',
+          url: site?.url || '',
           catalog: site?.catelog_name || site?.catelog || '',
           desc: site?.desc || ''
         }))
@@ -207,6 +276,7 @@ class SearchAutocomplete {
     const cards = document.querySelectorAll('.site-card');
     this.allBookmarks = Array.from(cards).map((card) => ({
       name: card.dataset.name || '',
+      url: card.dataset.url || '',
       catalog: card.dataset.catalog || '',
       desc: card.dataset.desc || ''
     }));
@@ -222,6 +292,7 @@ class SearchAutocomplete {
 
     this.allBookmarks.forEach((site) => {
       const name = String(site.name || '');
+      const url = String(site.url || '');
       const catalog = String(site.catalog || '');
       const desc = String(site.desc || '');
       if (!name) {
@@ -244,7 +315,13 @@ class SearchAutocomplete {
       }
 
       if (score > 0) {
-        scored.push({ value: name, score });
+        scored.push({
+          value: name,
+          score,
+          type: 'bookmark',
+          url,
+          catalog
+        });
       }
     });
 
@@ -253,12 +330,17 @@ class SearchAutocomplete {
     const suggestions = [];
 
     for (const item of scored) {
-      const key = item.value.toLowerCase();
+      const key = `${item.value.toLowerCase()}::${item.url}`;
       if (seen.has(key)) {
         continue;
       }
       seen.add(key);
-      suggestions.push(item.value);
+      suggestions.push({
+        value: item.value,
+        type: 'bookmark',
+        url: item.url,
+        catalog: item.catalog
+      });
       if (suggestions.length >= this.MAX_LOCAL_SUGGESTIONS) {
         break;
       }
@@ -284,9 +366,23 @@ class SearchAutocomplete {
 
     let merged = this.mergeSuggestions(localSuggestions, remoteSuggestions, this.MAX_TOTAL_SUGGESTIONS);
     if (merged.length === 0 && keyword) {
-      merged = [keyword];
+      merged = [this.buildQuerySuggestion(keyword, engine)];
     }
     this.renderAndToggle(merged, dropdown, list);
+  }
+
+  buildQuerySuggestion(value, engine = '') {
+    const normalizedValue = String(value || '').trim();
+    if (!normalizedValue) {
+      return null;
+    }
+    return {
+      value: normalizedValue,
+      type: 'query',
+      url: '',
+      catalog: '',
+      engine: String(engine || '').trim()
+    };
   }
 
   buildImmediateSuggestions(keyword, localSuggestions, engine) {
@@ -294,7 +390,11 @@ class SearchAutocomplete {
       return localSuggestions;
     }
 
-    const merged = this.mergeSuggestions([keyword], localSuggestions, this.MAX_TOTAL_SUGGESTIONS);
+    const merged = this.mergeSuggestions(
+      [this.buildQuerySuggestion(keyword, engine)],
+      localSuggestions,
+      this.MAX_TOTAL_SUGGESTIONS
+    );
     return merged;
   }
 
@@ -332,8 +432,8 @@ class SearchAutocomplete {
       const data = await response.json();
       const suggestions = Array.isArray(data?.suggestions)
         ? data.suggestions
-            .map((item) => String(item || '').trim())
-            .filter(Boolean)
+            .map((item) => this.buildQuerySuggestion(item, engine))
+            .filter((item) => !!item)
             .slice(0, this.MAX_TOTAL_SUGGESTIONS)
         : [];
 
@@ -356,19 +456,28 @@ class SearchAutocomplete {
   mergeSuggestions(localSuggestions, remoteSuggestions, maxCount) {
     const merged = [];
     const seen = new Set();
+    const seenText = new Set();
     const all = [...localSuggestions, ...remoteSuggestions];
 
     for (const item of all) {
-      const value = String(item || '').trim();
-      if (!value) {
+      const normalized = this.normalizeSuggestion(item, 'query');
+      if (!normalized) {
         continue;
       }
-      const key = value.toLowerCase();
+      const textKey = normalized.value.toLowerCase();
+      if (seenText.has(textKey) && normalized.type !== 'bookmark') {
+        continue;
+      }
+      const dedupeKey = normalized.type === 'bookmark' && normalized.url
+        ? `bookmark::${normalized.url}`
+        : `query::${textKey}`;
+      const key = dedupeKey;
       if (seen.has(key)) {
         continue;
       }
       seen.add(key);
-      merged.push(value);
+      seenText.add(textKey);
+      merged.push(normalized);
       if (merged.length >= maxCount) {
         break;
       }
@@ -391,17 +500,42 @@ class SearchAutocomplete {
     list.innerHTML = '';
 
     suggestions.forEach((suggestion) => {
+      const normalized = this.normalizeSuggestion(suggestion, 'query');
+      if (!normalized) {
+        return;
+      }
+
+      const isBookmark = normalized.type === 'bookmark' && this.isSafeHttpUrl(normalized.url);
+      const tagClass = isBookmark ? 'suggestion-tag-bookmark' : 'suggestion-tag-query';
+      const tagText = isBookmark ? '书签' : '联想';
+      const iconHtml = isBookmark
+        ? `<svg class="suggestion-icon-external suggestion-icon-bookmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+             <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1z"></path>
+           </svg>`
+        : `<svg class="suggestion-icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+             <circle cx="11" cy="11" r="8"></circle>
+             <path d="m21 21-4.35-4.35"></path>
+           </svg>`;
+      const bookmarkMeta = isBookmark && normalized.catalog
+        ? `<div class="suggestion-meta"><span class="suggestion-category">${escapeHTML(normalized.catalog)}</span></div>`
+        : '';
+
       const li = document.createElement('li');
       li.className = 'suggestion-item';
-      li.dataset.value = suggestion;
+      li.dataset.value = normalized.value;
+      li.dataset.type = normalized.type;
+      li.dataset.url = normalized.url;
+      li.dataset.catalog = normalized.catalog;
+      li.dataset.engine = normalized.engine;
       li.innerHTML = `
         <div class="suggestion-content">
-          <svg class="suggestion-icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.35-4.35"></path>
-          </svg>
+          ${iconHtml}
           <div class="suggestion-text">
-            <div class="suggestion-title">${escapeHTML(suggestion)}</div>
+            <div class="suggestion-title-row">
+              <div class="suggestion-title">${escapeHTML(normalized.value)}</div>
+              <span class="suggestion-tag ${tagClass}">${tagText}</span>
+            </div>
+            ${bookmarkMeta}
           </div>
         </div>
       `;
