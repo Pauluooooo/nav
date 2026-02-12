@@ -28,16 +28,14 @@ export async function onRequestGet({ env }) {
     home_hide_stats: false,
     home_stats_size: '',
     home_stats_color: '',
-    home_hide_hitokoto: false,
-    home_hitokoto_size: '',
-    home_hitokoto_color: '',
     layout_grid_cols: '4',
     layout_custom_wallpaper: '',
     layout_menu_layout: 'horizontal',
     layout_enable_frosted_glass: false,
     layout_frosted_glass_intensity: '15',
     layout_enable_bg_blur: false,
-    layout_bg_blur_intensity: '0'
+    layout_bg_blur_intensity: '0',
+    layout_card_scale: '100'
   };
 
   try {
@@ -49,7 +47,7 @@ export async function onRequestGet({ env }) {
       'home_title_size', 'home_title_color',
       'home_subtitle_size', 'home_subtitle_color',
       'home_hide_stats', 'home_stats_size', 'home_stats_color',
-      'home_hide_hitokoto', 'home_hitokoto_size', 'home_hitokoto_color',
+      'layout_card_scale',
       'home_default_category'
     ];
     // Use dynamic placeholders
@@ -59,7 +57,7 @@ export async function onRequestGet({ env }) {
     if (results) {
       results.forEach(row => {
         // Explicitly handle booleans
-        const boolKeys = ['layout_hide_desc', 'layout_hide_links', 'layout_hide_category', 'layout_hide_title', 'layout_hide_subtitle', 'layout_enable_frosted_glass', 'layout_enable_bg_blur', 'home_hide_stats', 'home_hide_hitokoto'];
+        const boolKeys = ['layout_hide_desc', 'layout_hide_links', 'layout_hide_category', 'layout_hide_title', 'layout_hide_subtitle', 'layout_enable_frosted_glass', 'layout_enable_bg_blur', 'home_hide_stats'];
         if (boolKeys.includes(row.key)) {
              layoutSettings[row.key] = row.value === 'true';
         } else {

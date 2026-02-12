@@ -30,6 +30,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     return rect.top + window.scrollY;
   }
+
+  function runWhenIdle(task, timeout = 300) {
+    if (typeof task !== 'function') return;
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => task(), { timeout });
+      return;
+    }
+    setTimeout(task, 0);
+  }
+
+  function waitForIdle(timeout = 300) {
+    return new Promise((resolve) => runWhenIdle(resolve, timeout));
+  }
   
   function openSidebar() {
     sidebar?.classList.add('open');

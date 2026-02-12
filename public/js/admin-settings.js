@@ -46,6 +46,9 @@ const initSettings = () => {
   
   const cardRadiusInput = document.getElementById('cardRadius');
   const cardRadiusValue = document.getElementById('cardRadiusValue');
+  const cardScaleInput = document.getElementById('cardScale');
+  const cardScaleValue = document.getElementById('cardScaleValue');
+  const cardWidthSelect = document.getElementById('cardWidth');
 
   // Home Settings Inputs
   const hideTitleSwitch = document.getElementById('hideTitleSwitch');
@@ -63,11 +66,6 @@ const initSettings = () => {
   const homeStatsColorInput = document.getElementById('homeStatsColor');
   const homeStatsColorPicker = document.getElementById('homeStatsColorPicker');
 
-  const hideHitokotoSwitch = document.getElementById('hideHitokotoSwitch');
-  const homeHitokotoSizeInput = document.getElementById('homeHitokotoSize');
-  const homeHitokotoColorInput = document.getElementById('homeHitokotoColor');
-  const homeHitokotoColorPicker = document.getElementById('homeHitokotoColorPicker');
-
   // New Card Font Elements
   const cardTitleFontInput = document.getElementById('cardTitleFont');
   const cardTitleSizeInput = document.getElementById('cardTitleSize');
@@ -81,7 +79,6 @@ const initSettings = () => {
   const homeTitleFontInput = document.getElementById('homeTitleFont');
   const homeSubtitleFontInput = document.getElementById('homeSubtitleFont');
   const homeStatsFontInput = document.getElementById('homeStatsFont');
-  const homeHitokotoFontInput = document.getElementById('homeHitokotoFont');
 
   const homeSiteNameInput = document.getElementById('homeSiteName');
   const homeSiteDescriptionInput = document.getElementById('homeSiteDescription');
@@ -138,7 +135,7 @@ const initSettings = () => {
   }
 
   function populateFontSelects() {
-      const selects = [homeTitleFontInput, homeSubtitleFontInput, homeStatsFontInput, homeHitokotoFontInput, cardTitleFontInput, cardDescFontInput];
+      const selects = [homeTitleFontInput, homeSubtitleFontInput, homeStatsFontInput, cardTitleFontInput, cardDescFontInput];
       selects.forEach(select => {
           if (!select) return;
           select.innerHTML = '';
@@ -160,6 +157,8 @@ const initSettings = () => {
       const enableFrosted = frostedGlassSwitch.checked;
       const frostedIntensity = frostedGlassIntensityRange.value;
       const radius = document.getElementById('cardRadius').value;
+      const scalePercent = Number.parseInt(cardScaleInput?.value || '100', 10);
+      const cardScale = Number.isFinite(scalePercent) ? Math.max(70, Math.min(140, scalePercent)) / 100 : 1;
       
       const titleFont = cardTitleFontInput.value;
       const titleSize = cardTitleSizeInput.value;
@@ -178,6 +177,7 @@ const initSettings = () => {
           
           // Apply dynamic styles
           card.style.setProperty('--card-radius', radius + 'px');
+          card.style.setProperty('--card-scale', String(cardScale));
           
           const desc = card.querySelector('.preview-desc');
           const links = card.querySelector('.preview-links');
@@ -291,6 +291,13 @@ const initSettings = () => {
           updatePreviewCards();
       });
   }
+
+  if (cardScaleInput) {
+      cardScaleInput.addEventListener('input', () => {
+          if (cardScaleValue) cardScaleValue.textContent = cardScaleInput.value;
+          updatePreviewCards();
+      });
+  }
   
   // Real-time Card Font Preview Listeners
   [cardTitleFontInput, cardTitleSizeInput, cardTitleColorInput, cardDescFontInput, cardDescSizeInput, cardDescColorInput].forEach(input => {
@@ -336,9 +343,6 @@ const initSettings = () => {
     home_hide_stats: false,
     home_stats_size: '',
     home_stats_color: '',
-    home_hide_hitokoto: false,
-    home_hitokoto_size: '',
-    home_hitokoto_color: '',
     home_search_engine_enabled: false,
     home_search_engine_provider: 'local',
     home_theme_mode: 'auto',
@@ -358,7 +362,9 @@ const initSettings = () => {
     wallpaper_source: 'bing',
     wallpaper_cid_360: '36',
     layout_card_style: 'style1',
-    layout_card_border_radius: '12'
+    layout_card_border_radius: '12',
+    layout_card_scale: '100',
+    card_width: '100%'
   };
 
   let shouldStopBulkGeneration = false;
@@ -417,7 +423,6 @@ const initSettings = () => {
   setupColorPicker(homeTitleColorInput, homeTitleColorPicker);
   setupColorPicker(homeSubtitleColorInput, homeSubtitleColorPicker);
   setupColorPicker(homeStatsColorInput, homeStatsColorPicker);
-  setupColorPicker(homeHitokotoColorInput, homeHitokotoColorPicker);
   setupColorPicker(cardTitleColorInput, cardTitleColorPicker);
   setupColorPicker(cardDescColorInput, cardDescColorPicker);
 
@@ -785,14 +790,9 @@ const initSettings = () => {
     currentSettings.home_stats_size = homeStatsSizeInput.value.trim();
     currentSettings.home_stats_color = homeStatsColorInput.value.trim();
 
-    currentSettings.home_hide_hitokoto = hideHitokotoSwitch.checked;
-    currentSettings.home_hitokoto_size = homeHitokotoSizeInput.value.trim();
-    currentSettings.home_hitokoto_color = homeHitokotoColorInput.value.trim();
-
     currentSettings.home_title_font = homeTitleFontInput.value.trim();
     currentSettings.home_subtitle_font = homeSubtitleFontInput.value.trim();
     currentSettings.home_stats_font = homeStatsFontInput.value.trim();
-    currentSettings.home_hitokoto_font = homeHitokotoFontInput.value.trim();
 
     currentSettings.home_site_name = homeSiteNameInput.value.trim();
     currentSettings.home_site_description = homeSiteDescriptionInput.value.trim();
@@ -844,6 +844,8 @@ const initSettings = () => {
     currentSettings.layout_frosted_glass_intensity = frostedGlassIntensityRange.value;
     
     currentSettings.layout_card_border_radius = cardRadiusInput.value;
+    currentSettings.layout_card_scale = cardScaleInput ? cardScaleInput.value : (currentSettings.layout_card_scale || '100');
+    currentSettings.card_width = cardWidthSelect ? cardWidthSelect.value : (currentSettings.card_width || '100%');
     
     // layout_card_style is already updated by click listeners
     
@@ -970,10 +972,6 @@ const initSettings = () => {
             if (serverSettings.home_hide_stats !== undefined) currentSettings.home_hide_stats = serverSettings.home_hide_stats === 'true';
             if (serverSettings.home_stats_size) currentSettings.home_stats_size = serverSettings.home_stats_size;
             if (serverSettings.home_stats_color) currentSettings.home_stats_color = serverSettings.home_stats_color;
-
-            if (serverSettings.home_hide_hitokoto !== undefined) currentSettings.home_hide_hitokoto = serverSettings.home_hide_hitokoto === 'true';
-            if (serverSettings.home_hitokoto_size) currentSettings.home_hitokoto_size = serverSettings.home_hitokoto_size;
-            if (serverSettings.home_hitokoto_color) currentSettings.home_hitokoto_color = serverSettings.home_hitokoto_color;
             
             if (serverSettings.home_hide_github !== undefined) currentSettings.home_hide_github = serverSettings.home_hide_github === 'true';
             if (serverSettings.home_hide_admin !== undefined) currentSettings.home_hide_admin = serverSettings.home_hide_admin === 'true';
@@ -981,7 +979,6 @@ const initSettings = () => {
             if (serverSettings.home_title_font) currentSettings.home_title_font = serverSettings.home_title_font;
             if (serverSettings.home_subtitle_font) currentSettings.home_subtitle_font = serverSettings.home_subtitle_font;
             if (serverSettings.home_stats_font) currentSettings.home_stats_font = serverSettings.home_stats_font;
-            if (serverSettings.home_hitokoto_font) currentSettings.home_hitokoto_font = serverSettings.home_hitokoto_font;
 
             if (serverSettings.home_site_name) currentSettings.home_site_name = serverSettings.home_site_name;
             if (serverSettings.home_site_description) currentSettings.home_site_description = serverSettings.home_site_description;
@@ -1015,6 +1012,7 @@ const initSettings = () => {
             if (serverSettings.wallpaper_cid_360) currentSettings.wallpaper_cid_360 = serverSettings.wallpaper_cid_360;
             if (serverSettings.layout_card_style) currentSettings.layout_card_style = serverSettings.layout_card_style;
             if (serverSettings.layout_card_border_radius) currentSettings.layout_card_border_radius = serverSettings.layout_card_border_radius;
+            if (serverSettings.layout_card_scale) currentSettings.layout_card_scale = serverSettings.layout_card_scale;
 
             if (serverSettings.card_title_font) currentSettings.card_title_font = serverSettings.card_title_font;
             if (serverSettings.card_title_size) currentSettings.card_title_size = serverSettings.card_title_size;
@@ -1022,6 +1020,7 @@ const initSettings = () => {
             if (serverSettings.card_desc_font) currentSettings.card_desc_font = serverSettings.card_desc_font;
             if (serverSettings.card_desc_size) currentSettings.card_desc_size = serverSettings.card_desc_size;
             if (serverSettings.card_desc_color) currentSettings.card_desc_color = serverSettings.card_desc_color;
+            if (serverSettings.card_width) currentSettings.card_width = serverSettings.card_width;
 
         }
     } catch (e) {
@@ -1147,20 +1146,9 @@ const initSettings = () => {
         }
     }
 
-    if (hideHitokotoSwitch) hideHitokotoSwitch.checked = !!currentSettings.home_hide_hitokoto;
-    if (homeHitokotoSizeInput) homeHitokotoSizeInput.value = currentSettings.home_hitokoto_size || '14';
-    if (homeHitokotoColorInput) {
-        const val = currentSettings.home_hitokoto_color || '#6b7280';
-        homeHitokotoColorInput.value = val;
-        if (homeHitokotoColorPicker && /^#[0-9A-F]{6}$/i.test(val)) {
-            homeHitokotoColorPicker.value = val;
-        }
-    }
-
     if (homeTitleFontInput) homeTitleFontInput.value = currentSettings.home_title_font || '';
     if (homeSubtitleFontInput) homeSubtitleFontInput.value = currentSettings.home_subtitle_font || '';
     if (homeStatsFontInput) homeStatsFontInput.value = currentSettings.home_stats_font || '';
-    if (homeHitokotoFontInput) homeHitokotoFontInput.value = currentSettings.home_hitokoto_font || '';
 
     if (homeSiteNameInput) homeSiteNameInput.value = currentSettings.home_site_name || '';
     if (homeSiteDescriptionInput) homeSiteDescriptionInput.value = currentSettings.home_site_description || '';
@@ -1229,6 +1217,13 @@ const initSettings = () => {
         cardRadiusInput.value = currentSettings.layout_card_border_radius || '12';
         if (cardRadiusValue) cardRadiusValue.textContent = currentSettings.layout_card_border_radius || '12';
     }
+    if (cardScaleInput) {
+        cardScaleInput.value = currentSettings.layout_card_scale || '100';
+        if (cardScaleValue) cardScaleValue.textContent = currentSettings.layout_card_scale || '100';
+    }
+    if (cardWidthSelect) {
+        cardWidthSelect.value = currentSettings.card_width || '100%';
+    }
 
     if (cardTitleFontInput) cardTitleFontInput.value = currentSettings.card_title_font || '';
     if (cardTitleSizeInput) cardTitleSizeInput.value = currentSettings.card_title_size || '16';
@@ -1253,7 +1248,6 @@ const initSettings = () => {
     if (currentSettings.home_title_font) loadFont(currentSettings.home_title_font);
     if (currentSettings.home_subtitle_font) loadFont(currentSettings.home_subtitle_font);
     if (currentSettings.home_stats_font) loadFont(currentSettings.home_stats_font);
-    if (currentSettings.home_hitokoto_font) loadFont(currentSettings.home_hitokoto_font);
     if (currentSettings.card_title_font) loadFont(currentSettings.card_title_font);
     if (currentSettings.card_desc_font) loadFont(currentSettings.card_desc_font);
 

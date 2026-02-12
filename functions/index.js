@@ -175,9 +175,8 @@ export async function onRequest(context) {
     'layout_hide_title', 'home_title_size', 'home_title_color',
     'layout_hide_subtitle', 'home_subtitle_size', 'home_subtitle_color',
     'home_hide_stats', 'home_stats_size', 'home_stats_color',
-    'home_hide_hitokoto', 'home_hitokoto_size', 'home_hitokoto_color',
     'home_hide_github', 'home_hide_admin',
-    'home_custom_font_url', 'home_title_font', 'home_subtitle_font', 'home_stats_font', 'home_hitokoto_font',
+    'home_custom_font_url', 'home_title_font', 'home_subtitle_font', 'home_stats_font',
     'home_site_name', 'home_site_description',
     'home_search_engine_enabled', 'home_search_engine_provider',
     'home_theme_mode', 'home_theme_auto_dark_start', 'home_theme_auto_dark_end',
@@ -186,7 +185,7 @@ export async function onRequest(context) {
     'layout_random_wallpaper', 'bing_country',
     'layout_enable_frosted_glass', 'layout_frosted_glass_intensity',
     'layout_enable_bg_blur', 'layout_bg_blur_intensity', 'layout_card_style',
-    'layout_card_border_radius',
+    'layout_card_border_radius', 'layout_card_scale', 'card_width',
     'wallpaper_source', 'wallpaper_cid_360',
     'card_title_font', 'card_title_size', 'card_title_color',
     'card_desc_font', 'card_desc_size', 'card_desc_color'
@@ -253,16 +252,12 @@ export async function onRequest(context) {
   let homeHideStats = false;
   let homeStatsSize = '';
   let homeStatsColor = '';
-  let homeHideHitokoto = false;
-  let homeHitokotoSize = '';
-  let homeHitokotoColor = '';
   let homeHideGithub = false;
   let homeHideAdmin = false;
   let homeCustomFontUrl = '';
   let homeTitleFont = '';
   let homeSubtitleFont = '';
   let homeStatsFont = '';
-  let homeHitokotoFont = '';
   let homeSiteName = '';
   let homeSiteDescription = '';
   let homeSearchEngineEnabled = false;
@@ -283,6 +278,7 @@ export async function onRequest(context) {
   let layoutBgBlurIntensity = '0';
   let layoutCardStyle = 'style1';
   let layoutCardBorderRadius = '12';
+  let layoutCardScale = '100';
   let wallpaperSource = 'bing';
   let wallpaperCid360 = '36';
   
@@ -292,6 +288,7 @@ export async function onRequest(context) {
   let cardDescFont = '';
   let cardDescSize = '';
   let cardDescColor = '';
+  let cardWidth = '100%';
 
   if (settingsResult.results) {
     settingsResult.results.forEach(row => {
@@ -311,10 +308,6 @@ export async function onRequest(context) {
       if (row.key === 'home_stats_size') homeStatsSize = row.value;
       if (row.key === 'home_stats_color') homeStatsColor = row.value;
 
-      if (row.key === 'home_hide_hitokoto') homeHideHitokoto = row.value === 'true';
-      if (row.key === 'home_hitokoto_size') homeHitokotoSize = row.value;
-      if (row.key === 'home_hitokoto_color') homeHitokotoColor = row.value;
-      
       if (row.key === 'home_hide_github') homeHideGithub = (row.value === 'true' || row.value === '1');
       if (row.key === 'home_hide_admin') homeHideAdmin = (row.value === 'true' || row.value === '1');
 
@@ -322,7 +315,6 @@ export async function onRequest(context) {
       if (row.key === 'home_title_font') homeTitleFont = row.value;
       if (row.key === 'home_subtitle_font') homeSubtitleFont = row.value;
       if (row.key === 'home_stats_font') homeStatsFont = row.value;
-      if (row.key === 'home_hitokoto_font') homeHitokotoFont = row.value;
 
       if (row.key === 'home_site_name') homeSiteName = row.value;
       if (row.key === 'home_site_description') homeSiteDescription = row.value;
@@ -346,6 +338,7 @@ export async function onRequest(context) {
       if (row.key === 'layout_bg_blur_intensity') layoutBgBlurIntensity = row.value;
       if (row.key === 'layout_card_style') layoutCardStyle = row.value;
       if (row.key === 'layout_card_border_radius') layoutCardBorderRadius = row.value;
+      if (row.key === 'layout_card_scale') layoutCardScale = row.value;
       if (row.key === 'wallpaper_source') wallpaperSource = row.value;
       if (row.key === 'wallpaper_cid_360') wallpaperCid360 = row.value;
       
@@ -355,6 +348,7 @@ export async function onRequest(context) {
       if (row.key === 'card_desc_font') cardDescFont = row.value;
       if (row.key === 'card_desc_size') cardDescSize = row.value;
       if (row.key === 'card_desc_color') cardDescColor = row.value;
+      if (row.key === 'card_width') cardWidth = row.value;
     });
   }
 
@@ -1058,7 +1052,6 @@ export async function onRequest(context) {
   const siteName = homeSiteName || env.SITE_NAME || 'Iori Nav';
   const siteDescription = homeSiteDescription || env.SITE_DESCRIPTION || 'Bookmarks navigation';
   const footerText = env.FOOTER_TEXT || 'Iori Nav';
-  const hitokotoContent = homeHideHitokoto ? '' : '...';
 
   // Build Style Strings
   const getStyleStr = (size, color, font) => {
@@ -1072,10 +1065,9 @@ export async function onRequest(context) {
   const titleStyle = getStyleStr(homeTitleSize, homeTitleColor, homeTitleFont);
   const subtitleStyle = getStyleStr(homeSubtitleSize, homeSubtitleColor, homeSubtitleFont);
   const statsStyle = getStyleStr(homeStatsSize, homeStatsColor, homeStatsFont);
-  const hitokotoStyle = getStyleStr(homeHitokotoSize, homeHitokotoColor, homeHitokotoFont);
 
   // Determine if the stats row should be rendered with padding/margin
-  const shouldRenderStatsRow = !homeHideStats || !homeHideHitokoto;
+  const shouldRenderStatsRow = !homeHideStats;
   const statsRowPyClass = shouldRenderStatsRow ? 'my-8' : 'hidden';
   const statsRowMbClass = '';
   const statsRowHiddenClass = shouldRenderStatsRow ? '' : 'hidden';
@@ -1243,8 +1235,6 @@ export async function onRequest(context) {
       ? 'bg-transparent py-8 px-6 mt-12 border-none shadow-none text-black dark:text-gray-200'
       : 'bg-white py-8 px-6 mt-12 border-t border-primary-100 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-400';
       
-  const hitokotoClass = (isCustomWallpaper ? 'text-black dark:text-gray-200' : 'text-gray-500 dark:text-gray-400') + ' ml-auto';
-
   const templateResponse = await env.ASSETS.fetch(new URL('/index.html', request.url));
   let html = await templateResponse.text();
   
@@ -1336,10 +1326,13 @@ export async function onRequest(context) {
   
   // Inject Card CSS Variables
   const cardRadius = parseInt(layoutCardBorderRadius) || 12;
+  const cardScaleRaw = parseInt(String(layoutCardScale), 10);
+  const cardScalePercent = Number.isFinite(cardScaleRaw) ? Math.max(70, Math.min(140, cardScaleRaw)) : 100;
+  const cardScale = (cardScalePercent / 100).toFixed(2);
   const frostedBlurRaw = String(layoutFrostedGlassIntensity || '15').replace(/[^0-9]/g, '');
   const frostedBlur = frostedBlurRaw || '15';
   
-  const cardCssVars = `<style>:root { --card-padding: 1.25rem; --card-radius: ${cardRadius}px; --frosted-glass-blur: ${frostedBlur}px; }</style>`;
+  const cardCssVars = `<style>:root { --card-padding: 1.25rem; --card-radius: ${cardRadius}px; --card-scale: ${cardScale}; --frosted-glass-blur: ${frostedBlur}px; }</style>`;
   html = html.replace('</head>', `${cardCssVars}</head>`);
 
   // 自动注入字体资源
@@ -1350,7 +1343,6 @@ export async function onRequest(context) {
   if (!layoutHideTitle && homeTitleFont) usedFonts.add(homeTitleFont);
   if (!layoutHideSubtitle && homeSubtitleFont) usedFonts.add(homeSubtitleFont);
   if (!homeHideStats && homeStatsFont) usedFonts.add(homeStatsFont);
-  if (!homeHideHitokoto && homeHitokotoFont) usedFonts.add(homeHitokotoFont);
   
   // 卡片字体始终添加，因为它们是卡片的基本元素
   if (cardTitleFont) usedFonts.add(cardTitleFont);
@@ -1384,6 +1376,9 @@ export async function onRequest(context) {
       const s = getStyleStr(cardDescSize, cardDescColor, cardDescFont).replace('style="', '').replace('"', '');
       if (s) customCardCss += `.site-card p { ${s} }`;
   }
+  if (cardWidth && cardWidth !== '100%') {
+      customCardCss += `.site-card { width: ${cardWidth}; }`;
+  }
   customCardCss += '</style>';
   
   if (customCardCss !== '<style></style>') {
@@ -1408,6 +1403,7 @@ export async function onRequest(context) {
         hideCategory: ${layoutHideCategory},
         gridCols: "${layoutGridCols}",
         cardStyle: "${layoutCardStyle}",
+        cardWidth: "${cardWidth}",
         enableFrostedGlass: ${layoutEnableFrostedGlass},
         rememberLastCategory: ${homeRememberLastCategory},
         randomWallpaper: ${layoutRandomWallpaper},
@@ -1428,7 +1424,6 @@ export async function onRequest(context) {
     .replace('{{HEADER_CLASS}}', headerClass)
     .replace('{{CONTAINER_CLASS}}', containerClass)
     .replace('{{FOOTER_CLASS}}', footerClass)
-    .replace('{{HITOKOTO_CLASS}}', hitokotoClass)
     .replace('{{LEFT_TOP_ACTION}}', leftTopActionHtml)
     .replace('{{RIGHT_TOP_ACTION}}', topRightActionsHtml)
     .replace('{{THEME_MODE_DEFAULT}}', homeThemeMode)
@@ -1448,12 +1443,9 @@ export async function onRequest(context) {
     .replace('{{HEADING_ACTIVE}}', headingActiveAttr)
     .replace('{{STATS_VISIBLE}}', homeHideStats ? 'hidden' : '')
     .replace('{{STATS_STYLE}}', statsStyle)
-    .replace('{{HITOKOTO_VISIBLE}}', homeHideHitokoto ? 'hidden' : '')
     .replace('{{STATS_ROW_PY_CLASS}}', statsRowPyClass)
     .replace('{{STATS_ROW_MB_CLASS}}', statsRowMbClass)
     .replace('{{STATS_ROW_HIDDEN}}', statsRowHiddenClass)
-    .replace('{{HITOKOTO_CONTENT}}', hitokotoContent)
-    .replace(/{{HITOKOTO_STYLE}}/g, hitokotoStyle)
     .replace('{{SITES_GRID}}', sitesGridMarkup)
     .replace('{{CURRENT_YEAR}}', new Date().getFullYear())
     .replace('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6', gridClass)

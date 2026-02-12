@@ -1,0 +1,3604 @@
+------formdata-undici-016274329175
+Content-Disposition: form-data; name="metadata"
+
+{"main_module":"functionsWorker-0.6607497961587152.js"}
+------formdata-undici-016274329175
+Content-Disposition: form-data; name="functionsWorker-0.6607497961587152.js"; filename="functionsWorker-0.6607497961587152.js"
+Content-Type: application/javascript+module
+
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+// constants.js
+var SCHEMA_VERSION = "v2";
+var DB_SCHEMA = `
+CREATE TABLE IF NOT EXISTS sites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  logo TEXT,
+  desc TEXT,
+  catelog_id INTEGER NOT NULL,
+  catelog_name TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 9999,
+  is_private INTEGER DEFAULT 0,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pending_sites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  logo TEXT,
+  desc TEXT,
+  catelog_id INTEGER NOT NULL,
+  catelog_name TEXT,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS category (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  catelog TEXT  NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 9999,
+  parent_id INTEGER DEFAULT 0,
+  is_private INTEGER DEFAULT 0,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sites_catelog_id ON sites(catelog_id);
+CREATE INDEX IF NOT EXISTS idx_sites_sort_order ON sites(sort_order);
+`;
+var FONT_MAP = {
+  // System Fonts (无需引入)
+  "sans-serif": null,
+  "serif": null,
+  "monospace": null,
+  "'Microsoft YaHei', sans-serif": null,
+  "'SimSun', serif": null,
+  "'PingFang SC', sans-serif": null,
+  "'Segoe UI', sans-serif": null,
+  // Web Fonts (fonts.loli.net)
+  "'Noto Sans SC', sans-serif": "https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap",
+  "'Noto Serif SC', serif": "https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&display=swap",
+  "'Ma Shan Zheng', cursive": "https://fonts.loli.net/css2?family=Ma+Shan+Zheng&display=swap",
+  // 书法
+  "'ZCOOL KuaiLe', cursive": "https://fonts.loli.net/css2?family=ZCOOL+KuaiLe&display=swap",
+  // 快乐体
+  "'Long Cang', cursive": "https://fonts.loli.net/css2?family=Long+Cang&display=swap",
+  // 草书
+  "'Roboto', sans-serif": "https://fonts.loli.net/css2?family=Roboto:wght@300;400;500;700&display=swap",
+  "'Open Sans', sans-serif": "https://fonts.loli.net/css2?family=Open+Sans:wght@400;600;700&display=swap",
+  "'Lato', sans-serif": "https://fonts.loli.net/css2?family=Lato:wght@400;700&display=swap",
+  "'Montserrat', sans-serif": "https://fonts.loli.net/css2?family=Montserrat:wght@400;700&display=swap"
+};
+
+// _middleware.js
+function normalizeSortOrder(val) {
+  const num = Number(val);
+  return Number.isFinite(num) ? num : 9999;
+}
+__name(normalizeSortOrder, "normalizeSortOrder");
+function isSubmissionEnabled(env) {
+  return String(env.ENABLE_PUBLIC_SUBMISSION) === "true";
+}
+__name(isSubmissionEnabled, "isSubmissionEnabled");
+async function isAdminAuthenticated(request, env) {
+  const cookie = request.headers.get("Cookie");
+  if (!cookie) return false;
+  const match2 = cookie.match(/admin_session=([^;]+)/);
+  if (!match2) return false;
+  const token = match2[1];
+  const session = await env.NAV_AUTH.get(`session_${token}`);
+  return Boolean(session);
+}
+__name(isAdminAuthenticated, "isAdminAuthenticated");
+function errorResponse(message, status) {
+  return new Response(JSON.stringify({ code: status, message }), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+__name(errorResponse, "errorResponse");
+function jsonResponse(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+__name(jsonResponse, "jsonResponse");
+async function clearHomeCache(env) {
+  try {
+    const keysToDelete = /* @__PURE__ */ new Set(["home_html_public", "home_html_private"]);
+    let cursor;
+    do {
+      const list = await env.NAV_AUTH.list({ prefix: "home_html_", cursor, limit: 1e3 });
+      (list.keys || []).forEach((item) => keysToDelete.add(item.name));
+      cursor = list.list_complete ? void 0 : list.cursor;
+    } while (cursor);
+    await Promise.all(Array.from(keysToDelete).map((key) => env.NAV_AUTH.delete(key)));
+    console.log("Home cache cleared");
+  } catch (e) {
+    console.error("Failed to clear home cache:", e);
+  }
+}
+__name(clearHomeCache, "clearHomeCache");
+var dbInitialized = false;
+async function initializeDb(db, kv) {
+  if (dbInitialized) return;
+  if (kv) {
+    try {
+      const migrated = await kv.get(`schema_migrated_${SCHEMA_VERSION}`);
+      if (migrated) {
+        dbInitialized = true;
+        return;
+      }
+    } catch (e) {
+      console.warn("KV check failed:", e);
+    }
+  }
+  try {
+    console.log("Initializing database...");
+    const statements = DB_SCHEMA.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
+    const preparedStatements = statements.map((stmt) => db.prepare(stmt));
+    await db.batch(preparedStatements);
+    dbInitialized = true;
+    if (kv) {
+      await kv.put(`db_init_${SCHEMA_VERSION}`, "true");
+      await kv.put(`schema_migrated_${SCHEMA_VERSION}`, "true");
+    }
+    console.log("Database initialized successfully.");
+  } catch (e) {
+    console.error("Database initialization failed:", e);
+  }
+}
+__name(initializeDb, "initializeDb");
+async function onRequest(context) {
+  if (context.env.NAV_DB) {
+    await initializeDb(context.env.NAV_DB, context.env.NAV_AUTH);
+  }
+  return context.next();
+}
+__name(onRequest, "onRequest");
+
+// api/cache/clear.js
+async function onRequestPost(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    await clearHomeCache(env);
+    const response = jsonResponse({
+      code: 200,
+      message: "\u9996\u9875\u7F13\u5B58\u5DF2\u6E05\u9664"
+    });
+    response.headers.append("Set-Cookie", "iori_cache_stale=; Path=/; Max-Age=0; SameSite=Lax");
+    return response;
+  } catch (e) {
+    return errorResponse(`Failed to clear cache: ${e.message}`, 500);
+  }
+}
+__name(onRequestPost, "onRequestPost");
+
+// api/categories/create.js
+async function onRequestPost2(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const body = await request.json();
+    const categoryName = (body.catelog || "").trim();
+    if (!categoryName) {
+      return errorResponse("\u5206\u7C7B\u540D\u79F0\u4E0D\u80FD\u4E3A\u7A7A", 400);
+    }
+    const parentId = body.parent_id ? parseInt(body.parent_id, 10) : 0;
+    const existing = await env.NAV_DB.prepare(
+      "SELECT catelog FROM category WHERE catelog = ? AND parent_id = ?"
+    ).bind(categoryName, parentId).first();
+    if (existing) {
+      return errorResponse("\u8BE5\u5206\u7C7B\u540D\u79F0\u5728\u5F53\u524D\u7236\u5206\u7C7B\u4E0B\u5DF2\u5B58\u5728", 400);
+    }
+    const sortOrderValue = normalizeSortOrder(body.sort_order);
+    const isPrivate = body.is_private ? 1 : 0;
+    await env.NAV_DB.prepare(`
+      INSERT INTO category (catelog, sort_order, parent_id, is_private)
+      VALUES (?, ?, ?, ?)
+    `).bind(categoryName, sortOrderValue, parentId, isPrivate).run();
+    return jsonResponse({
+      code: 201,
+      message: "\u5206\u7C7B\u521B\u5EFA\u6210\u529F",
+      data: {
+        catelog: categoryName,
+        sort_order: sortOrderValue,
+        parent_id: parentId,
+        is_private: isPrivate
+      }
+    }, 201);
+  } catch (e) {
+    return errorResponse(`\u521B\u5EFA\u5206\u7C7B\u5931\u8D25: ${e.message}`, 500);
+  }
+}
+__name(onRequestPost2, "onRequestPost");
+
+// api/config/batch.js
+var CHUNK_SIZE = 50;
+function splitChunks(items, size = CHUNK_SIZE) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+__name(splitChunks, "splitChunks");
+function normalizeIdList(ids) {
+  if (!Array.isArray(ids)) return [];
+  const seen = /* @__PURE__ */ new Set();
+  const normalized = [];
+  ids.forEach((id) => {
+    const num = Number(id);
+    if (!Number.isInteger(num) || num <= 0 || seen.has(num)) {
+      return;
+    }
+    seen.add(num);
+    normalized.push(num);
+  });
+  return normalized;
+}
+__name(normalizeIdList, "normalizeIdList");
+async function collectAffectedCategoryIds(db, idChunks) {
+  const affected = /* @__PURE__ */ new Set();
+  for (const chunk of idChunks) {
+    const placeholders = chunk.map(() => "?").join(",");
+    const { results } = await db.prepare(`SELECT DISTINCT catelog_id FROM sites WHERE id IN (${placeholders}) AND catelog_id IS NOT NULL`).bind(...chunk).all();
+    (results || []).forEach((row) => {
+      const categoryId = Number(row.catelog_id);
+      if (Number.isInteger(categoryId) && categoryId > 0) {
+        affected.add(categoryId);
+      }
+    });
+  }
+  return Array.from(affected);
+}
+__name(collectAffectedCategoryIds, "collectAffectedCategoryIds");
+async function expandCategoryIdsWithAncestors(db, categoryIds) {
+  const visited = new Set(categoryIds);
+  let frontier = [...categoryIds];
+  while (frontier.length > 0) {
+    const nextFrontier = [];
+    for (const chunk of splitChunks(frontier)) {
+      const placeholders = chunk.map(() => "?").join(",");
+      const { results } = await db.prepare(`SELECT id, parent_id FROM category WHERE id IN (${placeholders})`).bind(...chunk).all();
+      (results || []).forEach((row) => {
+        const parentId = Number(row.parent_id || 0);
+        if (Number.isInteger(parentId) && parentId > 0 && !visited.has(parentId)) {
+          visited.add(parentId);
+          nextFrontier.push(parentId);
+        }
+      });
+    }
+    frontier = nextFrontier;
+  }
+  return Array.from(visited);
+}
+__name(expandCategoryIdsWithAncestors, "expandCategoryIdsWithAncestors");
+async function cleanupEmptyCategories(db, categoryIds) {
+  if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+    return 0;
+  }
+  let totalDeleted = 0;
+  let changed = 0;
+  do {
+    changed = 0;
+    for (const chunk of splitChunks(categoryIds)) {
+      const placeholders = chunk.map(() => "?").join(",");
+      const result = await db.prepare(`
+          DELETE FROM category
+          WHERE id IN (${placeholders})
+            AND NOT EXISTS (
+              SELECT 1
+              FROM sites s
+              WHERE s.catelog_id = category.id
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM category child
+              WHERE child.parent_id = category.id
+            )
+        `).bind(...chunk).run();
+      const deleted = Number(result?.meta?.changes || 0);
+      changed += deleted;
+      totalDeleted += deleted;
+    }
+  } while (changed > 0);
+  return totalDeleted;
+}
+__name(cleanupEmptyCategories, "cleanupEmptyCategories");
+async function onRequestPost3(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const { action, ids, payload } = await request.json();
+    const normalizedIds = normalizeIdList(ids);
+    if (normalizedIds.length === 0) {
+      return errorResponse("\u672A\u63D0\u4F9B\u6709\u6548 ID", 400);
+    }
+    const idChunks = splitChunks(normalizedIds);
+    const statements = [];
+    if (action === "delete") {
+      const directCategoryIds = await collectAffectedCategoryIds(env.NAV_DB, idChunks);
+      idChunks.forEach((chunk) => {
+        const placeholders = chunk.map(() => "?").join(",");
+        statements.push(
+          env.NAV_DB.prepare(`DELETE FROM sites WHERE id IN (${placeholders})`).bind(...chunk)
+        );
+      });
+      if (statements.length > 0) {
+        await env.NAV_DB.batch(statements);
+      }
+      const cleanupScope = await expandCategoryIdsWithAncestors(env.NAV_DB, directCategoryIds);
+      const deletedCategories = await cleanupEmptyCategories(env.NAV_DB, cleanupScope);
+      const categoryCleanupMessage = deletedCategories > 0 ? `\uFF0C\u5E76\u6E05\u7406 ${deletedCategories} \u4E2A\u7A7A\u5206\u7C7B` : "";
+      return jsonResponse({
+        code: 200,
+        message: `\u6210\u529F\u5220\u9664 ${normalizedIds.length} \u6761\u4E66\u7B7E${categoryCleanupMessage}`
+      });
+    }
+    if (action === "update_category") {
+      const categoryId = Number(payload?.categoryId);
+      if (!Number.isInteger(categoryId) || categoryId <= 0) {
+        return errorResponse("\u5206\u7C7B ID \u662F\u5FC5\u586B\u9879", 400);
+      }
+      const category = await env.NAV_DB.prepare("SELECT catelog, is_private FROM category WHERE id = ?").bind(categoryId).first();
+      if (!category) {
+        return errorResponse("\u627E\u4E0D\u5230\u5206\u7C7B", 404);
+      }
+      let baseSql = "UPDATE sites SET catelog_id = ?, catelog_name = ?";
+      const baseParams = [categoryId, category.catelog];
+      if (Number(category.is_private) === 1) {
+        baseSql += ", is_private = 1";
+      }
+      idChunks.forEach((chunk) => {
+        const placeholders = chunk.map(() => "?").join(",");
+        statements.push(
+          env.NAV_DB.prepare(`${baseSql} WHERE id IN (${placeholders})`).bind(...baseParams, ...chunk)
+        );
+      });
+      if (statements.length > 0) {
+        await env.NAV_DB.batch(statements);
+      }
+      return jsonResponse({
+        code: 200,
+        message: `\u6210\u529F\u66F4\u65B0 ${normalizedIds.length} \u6761\u4E66\u7B7E\u7684\u5206\u7C7B`
+      });
+    }
+    if (action === "update_privacy") {
+      const isPrivate = payload?.isPrivate;
+      if (isPrivate === void 0) {
+        return errorResponse("\u9690\u79C1\u72B6\u6001\u662F\u5FC5\u586B\u9879", 400);
+      }
+      const isPrivateValue = isPrivate ? 1 : 0;
+      idChunks.forEach((chunk) => {
+        const placeholders = chunk.map(() => "?").join(",");
+        statements.push(
+          env.NAV_DB.prepare(`UPDATE sites SET is_private = ? WHERE id IN (${placeholders})`).bind(isPrivateValue, ...chunk)
+        );
+      });
+      if (statements.length > 0) {
+        await env.NAV_DB.batch(statements);
+      }
+      return jsonResponse({
+        code: 200,
+        message: `\u6210\u529F\u66F4\u65B0 ${normalizedIds.length} \u6761\u4E66\u7B7E\u7684\u9690\u79C1\u5C5E\u6027`
+      });
+    }
+    return errorResponse("\u65E0\u6548\u7684\u64CD\u4F5C", 400);
+  } catch (e) {
+    return errorResponse(`\u6279\u91CF\u64CD\u4F5C\u5931\u8D25: ${e.message}`, 500);
+  }
+}
+__name(onRequestPost3, "onRequestPost");
+
+// api/config/export.js
+async function onRequestGet(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  const url = new URL(request.url);
+  const includePrivate = url.searchParams.get("include_private") === "true";
+  try {
+    let categoryQuery = "SELECT id, catelog, sort_order, parent_id, is_private FROM category";
+    let sitesQuery = "SELECT id, name, url, logo, desc, catelog_id, sort_order, is_private FROM sites";
+    if (!includePrivate) {
+      categoryQuery += " WHERE is_private = 0";
+      sitesQuery += " WHERE is_private = 0";
+    }
+    categoryQuery += " ORDER BY sort_order ASC";
+    sitesQuery += " ORDER BY sort_order ASC, create_time DESC";
+    const categoriesPromise = env.NAV_DB.prepare(categoryQuery).all();
+    const sitesPromise = env.NAV_DB.prepare(sitesQuery).all();
+    const [{ results: categories }, { results: sites }] = await Promise.all([categoriesPromise, sitesPromise]);
+    const exportData = {
+      category: categories,
+      sites
+    };
+    const jsonData = JSON.stringify(exportData, null, 2);
+    return new Response(jsonData, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="config.json"'
+      }
+    });
+  } catch (e) {
+    return errorResponse(`Failed to export config: ${e.message}`, 500);
+  }
+}
+__name(onRequestGet, "onRequestGet");
+
+// api/config/import.js
+async function onRequestPost4(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const jsonData = await request.json();
+    let categoriesToImport = [];
+    let sitesToImport = [];
+    let isNewFormat = false;
+    const override = !!jsonData.override;
+    let payload = jsonData;
+    if (jsonData.category && jsonData.sites && (jsonData.override !== void 0 || Object.keys(jsonData).length > 2)) {
+      payload = jsonData;
+    } else if (jsonData.category && jsonData.sites) {
+      payload = jsonData;
+    }
+    if (payload && typeof payload === "object" && Array.isArray(payload.category) && Array.isArray(payload.sites)) {
+      categoriesToImport = payload.category;
+      sitesToImport = payload.sites;
+      isNewFormat = true;
+    } else if (Array.isArray(jsonData)) {
+      sitesToImport = jsonData;
+    } else {
+      return errorResponse('Invalid JSON format. Expected { "category": [...], "sites": [...] } or an array of sites.', 400);
+    }
+    if (sitesToImport.length === 0) {
+      return jsonResponse({ code: 200, message: "Import successful, but no sites were found to import." });
+    }
+    const db = env.NAV_DB;
+    const BATCH_SIZE = 50;
+    const parsePrivacyFlag = /* @__PURE__ */ __name((value) => {
+      if (typeof value === "boolean") return value ? 1 : 0;
+      if (typeof value === "number") return value === 1 ? 1 : 0;
+      const normalized = String(value ?? "").trim().toLowerCase();
+      return ["1", "true", "yes", "on"].includes(normalized) ? 1 : 0;
+    }, "parsePrivacyFlag");
+    const oldCatIdToNewCatIdMap = /* @__PURE__ */ new Map();
+    let categoryNameToIdMap = /* @__PURE__ */ new Map();
+    const { results: existingDbCategoriesRaw } = await db.prepare("SELECT id, catelog, parent_id, is_private FROM category").all();
+    const existingDbCategories = existingDbCategoriesRaw || [];
+    const findExistingCategory = /* @__PURE__ */ __name((name, parentId) => {
+      const normalizedParentId = parentId === null || parentId === void 0 ? 0 : parseInt(parentId, 10);
+      return existingDbCategories.find((c) => {
+        const dbParentId = c.parent_id === null || c.parent_id === void 0 ? 0 : parseInt(c.parent_id, 10);
+        return c.catelog === name && dbParentId === normalizedParentId;
+      });
+    }, "findExistingCategory");
+    if (isNewFormat) {
+      for (const cat of categoriesToImport) {
+        if (!cat.catelog || !cat.catelog.trim()) {
+          return errorResponse("\u5BFC\u5165\u5931\u8D25\uFF1A\u5206\u7C7B\u6570\u636E\u4E2D\u5B58\u5728\u65E0\u6548\u6761\u76EE\uFF0C\u7F3A\u5C11 'catelog' \u540D\u79F0\u3002", 400);
+        }
+      }
+      let sortedCats = [];
+      let remaining = [...categoriesToImport];
+      let processedJsonIds = /* @__PURE__ */ new Set([0, "0"]);
+      let lastRemainingCount = -1;
+      while (remaining.length > 0) {
+        if (remaining.length === lastRemainingCount) {
+          sortedCats.push(...remaining);
+          break;
+        }
+        lastRemainingCount = remaining.length;
+        const [ready, notReady] = remaining.reduce((acc, cat) => {
+          const pid = cat.parent_id || 0;
+          if (processedJsonIds.has(pid)) {
+            acc[0].push(cat);
+          } else {
+            acc[1].push(cat);
+          }
+          return acc;
+        }, [[], []]);
+        ready.sort((a, b) => (a.id || 0) - (b.id || 0));
+        ready.forEach((cat) => processedJsonIds.add(cat.id));
+        sortedCats.push(...ready);
+        remaining = notReady;
+      }
+      categoriesToImport = sortedCats;
+      for (const cat of categoriesToImport) {
+        const catName = (cat.catelog || "").trim();
+        const jsonParentId = cat.parent_id || 0;
+        const isPrivate = parsePrivacyFlag(cat.is_private);
+        let dbParentId = 0;
+        if (jsonParentId !== 0) {
+          if (oldCatIdToNewCatIdMap.has(jsonParentId)) {
+            dbParentId = oldCatIdToNewCatIdMap.get(jsonParentId);
+          } else {
+            dbParentId = 0;
+          }
+        }
+        const existing = findExistingCategory(catName, dbParentId);
+        if (existing) {
+          oldCatIdToNewCatIdMap.set(cat.id, existing.id);
+        } else {
+          const sortOrder = normalizeSortOrder(cat.sort_order);
+          const result = await db.prepare("INSERT INTO category (catelog, sort_order, parent_id, is_private) VALUES (?, ?, ?, ?)").bind(catName, sortOrder, dbParentId, isPrivate).run();
+          let newId = result.meta.last_row_id;
+          const newCatObj = { id: newId, catelog: catName, parent_id: dbParentId, is_private: isPrivate };
+          if (!existingDbCategories) {
+          } else {
+            existingDbCategories.push(newCatObj);
+          }
+          oldCatIdToNewCatIdMap.set(cat.id, newId);
+        }
+      }
+    } else {
+      if (existingDbCategories) {
+        existingDbCategories.forEach((c) => categoryNameToIdMap.set(c.catelog, c.id));
+      }
+      const defaultCategory = "Default";
+      const categoryNames = [...new Set(sitesToImport.map((item) => (item.catelog || defaultCategory).trim()))].filter((name) => name);
+      const newCategoryNames = categoryNames.filter((name) => !categoryNameToIdMap.has(name));
+      if (newCategoryNames.length > 0) {
+        const insertStmts = newCategoryNames.map((name) => db.prepare("INSERT INTO category (catelog, is_private) VALUES (?, 0)").bind(name));
+        await db.batch(insertStmts);
+        for (let i = 0; i < newCategoryNames.length; i += BATCH_SIZE) {
+          const chunk = newCategoryNames.slice(i, i + BATCH_SIZE);
+          const placeholders = chunk.map(() => "?").join(",");
+          const { results: newCategories } = await db.prepare(`SELECT id, catelog, is_private FROM category WHERE catelog IN (${placeholders})`).bind(...chunk).all();
+          if (newCategories) {
+            newCategories.forEach((c) => {
+              categoryNameToIdMap.set(c.catelog, c.id);
+              existingDbCategories.push(c);
+            });
+          }
+        }
+      }
+    }
+    let rootFallbackCategoryId = 0;
+    if (isNewFormat && sitesToImport.some((site) => Number(site?.catelog_id || 0) === 0)) {
+      const rootCandidates = ["\u672A\u5206\u7C7B", "Default"];
+      let rootCategory = existingDbCategories.find((c) => {
+        const catName = String(c?.catelog || "").trim();
+        const parentId = Number(c?.parent_id || 0);
+        return rootCandidates.includes(catName) && parentId === 0;
+      });
+      if (!rootCategory) {
+        const result = await db.prepare(
+          "INSERT INTO category (catelog, sort_order, parent_id, is_private) VALUES (?, ?, ?, ?)"
+        ).bind("\u672A\u5206\u7C7B", 9999, 0, 0).run();
+        rootCategory = { id: result.meta.last_row_id, catelog: "\u672A\u5206\u7C7B", parent_id: 0, is_private: 0 };
+        existingDbCategories.push(rootCategory);
+      }
+      rootFallbackCategoryId = Number(rootCategory.id);
+      oldCatIdToNewCatIdMap.set(0, rootFallbackCategoryId);
+      oldCatIdToNewCatIdMap.set("0", rootFallbackCategoryId);
+    }
+    const siteUrls = sitesToImport.map((item) => (item.url || "").trim()).filter((url) => url);
+    const existingSiteUrls = /* @__PURE__ */ new Set();
+    if (siteUrls.length > 0) {
+      for (let i = 0; i < siteUrls.length; i += BATCH_SIZE) {
+        const chunk = siteUrls.slice(i, i + BATCH_SIZE);
+        const placeholders = chunk.map(() => "?").join(",");
+        const { results: existingSites } = await db.prepare(`SELECT url FROM sites WHERE url IN (${placeholders})`).bind(...chunk).all();
+        if (existingSites) {
+          existingSites.forEach((site) => existingSiteUrls.add(site.url));
+        }
+      }
+    }
+    const batchStmts = [];
+    let itemsAdded = 0;
+    let itemsUpdated = 0;
+    let itemsSkipped = 0;
+    const iconAPI = env.ICON_API || "https://faviconsnap.com/api/favicon?url=";
+    for (const site of sitesToImport) {
+      const sanitizedUrl = (site.url || "").trim();
+      const sanitizedName = (site.name || "").trim();
+      if (!sanitizedUrl || !sanitizedName) {
+        itemsSkipped++;
+        continue;
+      }
+      if (isNewFormat && (site.catelog_id === void 0 || site.catelog_id === null)) {
+        itemsSkipped++;
+        continue;
+      }
+      const exists = existingSiteUrls.has(sanitizedUrl);
+      if (exists && !override) {
+        itemsSkipped++;
+        continue;
+      }
+      let newCatId;
+      let catNameForDb;
+      let catIsPrivate = 0;
+      if (isNewFormat) {
+        const sourceCatId = site.catelog_id ?? 0;
+        const normalizedSourceCatId = Number(sourceCatId || 0);
+        newCatId = oldCatIdToNewCatIdMap.get(sourceCatId);
+        if (!newCatId && oldCatIdToNewCatIdMap.has(normalizedSourceCatId)) {
+          newCatId = oldCatIdToNewCatIdMap.get(normalizedSourceCatId);
+        }
+        if (!newCatId && normalizedSourceCatId === 0 && rootFallbackCategoryId) {
+          newCatId = rootFallbackCategoryId;
+        }
+        if (!newCatId && site.catelog_name) {
+          const mappedByName = existingDbCategories.find((c) => String(c.catelog || "").trim() === String(site.catelog_name || "").trim());
+          if (mappedByName) newCatId = mappedByName.id;
+        }
+        const catObj = existingDbCategories.find((c) => Number(c.id) === Number(newCatId));
+        if (catObj) {
+          catNameForDb = catObj.catelog;
+          catIsPrivate = parsePrivacyFlag(catObj.is_private);
+        }
+      } else {
+        const catName = (site.catelog || "Default").trim();
+        newCatId = categoryNameToIdMap.get(catName);
+        catNameForDb = catName;
+        const catObj = existingDbCategories.find((c) => c.id === newCatId);
+        if (catObj) {
+          catIsPrivate = parsePrivacyFlag(catObj.is_private);
+        }
+      }
+      if (!newCatId) {
+        itemsSkipped++;
+        continue;
+      }
+      let sanitizedLogo = (site.logo || "").trim();
+      if ((!sanitizedLogo || sanitizedLogo.startsWith("data:image")) && sanitizedUrl.startsWith("http")) {
+        const domain = sanitizedUrl.replace(/^https?:\/\//, "").split("/")[0];
+        sanitizedLogo = `${iconAPI}${domain}`;
+      }
+      if (!sanitizedLogo) sanitizedLogo = null;
+      const sanitizedDesc = (site.desc || "").trim() || null;
+      const sortOrderValue = normalizeSortOrder(site.sort_order);
+      let finalIsPrivate = parsePrivacyFlag(site.is_private);
+      if (catIsPrivate === 1) {
+        finalIsPrivate = 1;
+      }
+      if (exists && override) {
+        batchStmts.push(
+          db.prepare("UPDATE sites SET name=?, logo=?, desc=?, catelog_id=?, catelog_name=?, sort_order=?, is_private=?, update_time=CURRENT_TIMESTAMP WHERE url=?").bind(sanitizedName, sanitizedLogo, sanitizedDesc, newCatId, catNameForDb, sortOrderValue, finalIsPrivate, sanitizedUrl)
+        );
+        itemsUpdated++;
+      } else {
+        batchStmts.push(
+          db.prepare("INSERT INTO sites (name, url, logo, desc, catelog_id, catelog_name, sort_order, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(sanitizedName, sanitizedUrl, sanitizedLogo, sanitizedDesc, newCatId, catNameForDb, sortOrderValue, finalIsPrivate)
+        );
+        itemsAdded++;
+      }
+    }
+    if (batchStmts.length > 0) {
+      for (let i = 0; i < batchStmts.length; i += BATCH_SIZE) {
+        const chunk = batchStmts.slice(i, i + BATCH_SIZE);
+        await db.batch(chunk);
+      }
+    }
+    let msg = `\u5BFC\u5165\u5B8C\u6210\u3002`;
+    if (itemsAdded > 0) msg += ` \u65B0\u589E ${itemsAdded} \u4E2A`;
+    if (itemsUpdated > 0) msg += ` \u66F4\u65B0 ${itemsUpdated} \u4E2A`;
+    if (itemsSkipped > 0) msg += ` \u8DF3\u8FC7 ${itemsSkipped} \u4E2A`;
+    return jsonResponse({
+      code: 201,
+      message: msg
+    }, 201);
+  } catch (error) {
+    return errorResponse(`Failed to import config: ${error.message}`, 500);
+  }
+}
+__name(onRequestPost4, "onRequestPost");
+
+// api/config/submit.js
+async function onRequestPost5(context) {
+  const { request, env } = context;
+  if (!isSubmissionEnabled(env)) {
+    return errorResponse("Public submission disabled", 403);
+  }
+  try {
+    const config = await request.json();
+    const { name, url, logo, desc, catelog_id } = config;
+    const sanitizedName = (name || "").trim();
+    const sanitizedUrl = (url || "").trim();
+    const sanitizedLogo = (logo || "").trim() || null;
+    const sanitizedDesc = (desc || "").trim() || null;
+    if (!sanitizedName || !sanitizedUrl || !catelog_id) {
+      return errorResponse("Name, URL and Category are required", 400);
+    }
+    const categoryResult = await env.NAV_DB.prepare("SELECT catelog, is_private FROM category WHERE id = ?").bind(catelog_id).first();
+    const catelogName = categoryResult ? categoryResult.catelog : "Unknown";
+    await env.NAV_DB.prepare(`
+      INSERT INTO pending_sites (name, url, logo, desc, catelog_id, catelog_name)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(sanitizedName, sanitizedUrl, sanitizedLogo, sanitizedDesc, catelog_id, catelogName).run();
+    return jsonResponse({
+      code: 201,
+      message: "Config submitted successfully, waiting for admin approve"
+    }, 201);
+  } catch (e) {
+    return errorResponse(`Failed to submit config: ${e.message}`, 500);
+  }
+}
+__name(onRequestPost5, "onRequestPost");
+
+// api/search/suggestions.js
+var ALLOWED_ENGINES = /* @__PURE__ */ new Set(["baidu", "google", "bing"]);
+var MAX_SUGGESTIONS = 8;
+async function onRequestGet2({ request }) {
+  const url = new URL(request.url);
+  const keyword = (url.searchParams.get("q") || "").trim();
+  const requestedEngine = (url.searchParams.get("engine") || "baidu").toLowerCase();
+  const engine = ALLOWED_ENGINES.has(requestedEngine) ? requestedEngine : "baidu";
+  if (!keyword) {
+    return jsonResponse2({
+      suggestions: [],
+      engine,
+      timestamp: Date.now()
+    });
+  }
+  try {
+    let suggestions = [];
+    if (engine === "baidu") {
+      suggestions = await fetchBaiduSuggestions(keyword);
+    } else if (engine === "google") {
+      suggestions = await fetchGoogleSuggestions(keyword);
+    } else if (engine === "bing") {
+      suggestions = await fetchBingSuggestions(keyword);
+    }
+    return jsonResponse2({
+      suggestions: uniqueSuggestions(suggestions).slice(0, MAX_SUGGESTIONS),
+      engine,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error(`[Search Suggestions] Failed for ${engine}:`, error);
+    return jsonResponse2({
+      suggestions: [],
+      engine,
+      error: error.message,
+      timestamp: Date.now()
+    });
+  }
+}
+__name(onRequestGet2, "onRequestGet");
+async function fetchBaiduSuggestions(keyword) {
+  const data = await fetchJson(
+    `https://www.baidu.com/sugrec?prod=pc&wd=${encodeURIComponent(keyword)}`
+  );
+  if (!data || !Array.isArray(data.g)) {
+    return [];
+  }
+  return data.g.map((item) => item?.q).filter((item) => typeof item === "string" && item.trim());
+}
+__name(fetchBaiduSuggestions, "fetchBaiduSuggestions");
+async function fetchGoogleSuggestions(keyword) {
+  const data = await fetchJson(
+    `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(keyword)}`
+  );
+  if (Array.isArray(data) && Array.isArray(data[1])) {
+    return data[1].filter((item) => typeof item === "string" && item.trim());
+  }
+  return [];
+}
+__name(fetchGoogleSuggestions, "fetchGoogleSuggestions");
+async function fetchBingSuggestions(keyword) {
+  const data = await fetchJson(
+    `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(keyword)}`
+  );
+  if (Array.isArray(data) && Array.isArray(data[1])) {
+    return data[1].filter((item) => typeof item === "string" && item.trim());
+  }
+  return [];
+}
+__name(fetchBingSuggestions, "fetchBingSuggestions");
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json, text/plain, */*"
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`Upstream API error: ${response.status}`);
+  }
+  return response.json();
+}
+__name(fetchJson, "fetchJson");
+function uniqueSuggestions(suggestions) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const item of suggestions) {
+    const value = String(item || "").trim();
+    if (!value) {
+      continue;
+    }
+    const key = value.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(value);
+  }
+  return result;
+}
+__name(uniqueSuggestions, "uniqueSuggestions");
+function jsonResponse2(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS"
+    }
+  });
+}
+__name(jsonResponse2, "jsonResponse");
+async function onRequestOptions() {
+  return new Response(null, {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    }
+  });
+}
+__name(onRequestOptions, "onRequestOptions");
+
+// api/categories/[id].js
+async function onRequestPut(context) {
+  const { request, env, params } = context;
+  const categoryId = decodeURIComponent(params.id);
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const body = await request.json();
+    if (!categoryId) {
+      return errorResponse("Category id is required", 400);
+    }
+    if (body && body.reset) {
+      const hasChildren = await env.NAV_DB.prepare("SELECT id FROM category WHERE parent_id = ? LIMIT 1").bind(categoryId).first();
+      if (hasChildren) {
+        return errorResponse("\u65E0\u6CD5\u5220\u9664\uFF1A\u8BE5\u5206\u7C7B\u5305\u542B\u5B50\u5206\u7C7B\uFF0C\u8BF7\u5148\u5220\u9664\u6216\u79FB\u52A8\u5B50\u5206\u7C7B", 400);
+      }
+      const hasSites = await env.NAV_DB.prepare("SELECT id FROM sites WHERE catelog_id = ? LIMIT 1").bind(categoryId).first();
+      if (hasSites) {
+        return errorResponse("\u65E0\u6CD5\u5220\u9664\uFF1A\u8BE5\u5206\u7C7B\u5305\u542B\u4E66\u7B7E\uFF0C\u8BF7\u5148\u5220\u9664\u6216\u79FB\u52A8\u4E66\u7B7E", 400);
+      }
+      await env.NAV_DB.prepare("DELETE FROM category WHERE id = ?").bind(categoryId).run();
+      return jsonResponse({
+        code: 200,
+        message: "Category deleted successfully"
+      });
+    }
+    const { catelog } = body;
+    let { sort_order } = body;
+    if (!catelog) {
+      return errorResponse("Category name is required", 400);
+    }
+    const parentId = body.parent_id !== void 0 ? parseInt(body.parent_id, 10) : 0;
+    const existingCategory = await env.NAV_DB.prepare("SELECT id FROM category WHERE catelog = ? AND parent_id = ? AND id != ?").bind(catelog, parentId, categoryId).first();
+    if (existingCategory) {
+      return errorResponse("\u8BE5\u5206\u7C7B\u540D\u79F0\u5728\u5F53\u524D\u7236\u5206\u7C7B\u4E0B\u5DF2\u5B58\u5728", 409);
+    }
+    sort_order = normalizeSortOrder(sort_order);
+    const isPrivate = body.is_private ? 1 : 0;
+    await env.NAV_DB.prepare("UPDATE category SET catelog = ?, sort_order = ?, parent_id = ?, is_private = ? WHERE id = ?").bind(catelog, sort_order, parentId, isPrivate, categoryId).run();
+    await env.NAV_DB.prepare("UPDATE sites SET catelog_name = ? WHERE catelog_id = ?").bind(catelog, categoryId).run();
+    if (isPrivate === 1) {
+      await env.NAV_DB.prepare("UPDATE sites SET is_private = 1 WHERE catelog_id = ?").bind(categoryId).run();
+    }
+    return jsonResponse({
+      code: 200,
+      message: "Category updated successfully"
+    });
+  } catch (e) {
+    return errorResponse(`Failed to process category request: ${e.message}`, 500);
+  }
+}
+__name(onRequestPut, "onRequestPut");
+
+// api/config/[id].js
+async function onRequestGet3(context) {
+  const { request, env, params } = context;
+  const id = params.id;
+  const { results } = await env.NAV_DB.prepare("SELECT * FROM sites WHERE id = ?").bind(id).all();
+  if (results.length === 0) {
+    return errorResponse("config not found", 404);
+  }
+  const config = results[0];
+  if (config.is_private && !await isAdminAuthenticated(request, env)) {
+    return errorResponse("config not found", 404);
+  }
+  return jsonResponse({
+    code: 200,
+    data: config
+  });
+}
+__name(onRequestGet3, "onRequestGet");
+async function onRequestPut2(context) {
+  const { request, env, params } = context;
+  const id = params.id;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const config = await request.json();
+    const { name, url, logo, desc, catelog_id, sort_order, is_private } = config;
+    const sanitizedName = (name || "").trim();
+    const sanitizedUrl = (url || "").trim();
+    let sanitizedLogo = (logo || "").trim() || null;
+    const sanitizedDesc = (desc || "").trim() || null;
+    const sortOrderValue = normalizeSortOrder(sort_order);
+    const isPrivateValue = is_private ? 1 : 0;
+    if (!sanitizedName || !sanitizedUrl || !catelog_id) {
+      return errorResponse("Name, URL and Catelog are required", 400);
+    }
+    const iconAPI = env.ICON_API || "https://faviconsnap.com/api/favicon?url=";
+    if (!logo && url) {
+      if (url.startsWith("https://") || url.startsWith("http://")) {
+        const domain = url.replace(/^https?:\/\//, "").split("/")[0];
+        sanitizedLogo = iconAPI + domain;
+      }
+    }
+    const categoryResult = await env.NAV_DB.prepare("SELECT catelog, is_private FROM category WHERE id = ?").bind(catelog_id).first();
+    const catelogName = categoryResult ? categoryResult.catelog : "Unknown";
+    let finalIsPrivate = isPrivateValue;
+    if (categoryResult && categoryResult.is_private === 1) {
+      finalIsPrivate = 1;
+    }
+    const update = await env.NAV_DB.prepare(`
+      UPDATE sites
+      SET name = ?, url = ?, logo = ?, desc = ?, catelog_id = ?, catelog_name = ?, sort_order = ?, is_private = ?, update_time = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(sanitizedName, sanitizedUrl, sanitizedLogo, sanitizedDesc, catelog_id, catelogName, sortOrderValue, finalIsPrivate, id).run();
+    return jsonResponse({
+      code: 200,
+      message: "Config updated successfully",
+      update
+    });
+  } catch (e) {
+    return errorResponse(`Failed to update config: ${e.message}`, 500);
+  }
+}
+__name(onRequestPut2, "onRequestPut");
+async function onRequestDelete(context) {
+  const { request, env, params } = context;
+  const id = params.id;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const del = await env.NAV_DB.prepare("DELETE FROM sites WHERE id = ?").bind(id).run();
+    return jsonResponse({
+      code: 200,
+      message: "Config deleted successfully",
+      del
+    });
+  } catch (e) {
+    return errorResponse(`Failed to delete config: ${e.message}`, 500);
+  }
+}
+__name(onRequestDelete, "onRequestDelete");
+
+// api/pending/[id].js
+async function onRequestPut3(context) {
+  const { request, env, params } = context;
+  const id = params.id;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const { results } = await env.NAV_DB.prepare("SELECT * FROM pending_sites WHERE id = ?").bind(id).all();
+    if (results.length === 0) {
+      return errorResponse("Pending config not found", 404);
+    }
+    const config = results[0];
+    let { logo, url } = config;
+    let sanitizedLogo = logo;
+    const iconAPI = env.ICON_API || "https://faviconsnap.com/api/favicon?url=";
+    if (!logo && url) {
+      if (url.startsWith("https://") || url.startsWith("http://")) {
+        const domain = url.replace(/^https?:\/\//, "").split("/")[0];
+        sanitizedLogo = iconAPI + domain;
+      }
+    }
+    await env.NAV_DB.prepare(`
+      INSERT INTO sites (name, url, logo, desc, catelog_id, sort_order)
+      VALUES (?, ?, ?, ?, ?, 9999)
+    `).bind(config.name, config.url, sanitizedLogo, config.desc, config.catelog_id).run();
+    await env.NAV_DB.prepare("DELETE FROM pending_sites WHERE id = ?").bind(id).run();
+    return jsonResponse({
+      code: 200,
+      message: "Pending config approved successfully"
+    });
+  } catch (e) {
+    console.error("Error approving pending config:", e);
+    return errorResponse(`Failed to approve pending config: ${e.message}`, 500);
+  }
+}
+__name(onRequestPut3, "onRequestPut");
+async function onRequestDelete2(context) {
+  const { request, env, params } = context;
+  const id = params.id;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    await env.NAV_DB.prepare("DELETE FROM pending_sites WHERE id = ?").bind(id).run();
+    return jsonResponse({
+      code: 200,
+      message: "Pending config rejected successfully"
+    });
+  } catch (e) {
+    return errorResponse(`Failed to reject pending config: ${e.message}`, 500);
+  }
+}
+__name(onRequestDelete2, "onRequestDelete");
+
+// admin/login.js
+function escapeHTML(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+__name(escapeHTML, "escapeHTML");
+async function createAdminSession(env, ttl = 86400) {
+  const token = crypto.randomUUID();
+  await env.NAV_AUTH.put(`session_${token}`, Date.now().toString(), { expirationTtl: ttl });
+  return token;
+}
+__name(createAdminSession, "createAdminSession");
+function buildSessionCookie(token, options = {}) {
+  const maxAge = options.maxAge !== void 0 ? options.maxAge : 86400;
+  return `admin_session=${token}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Lax`;
+}
+__name(buildSessionCookie, "buildSessionCookie");
+function renderLoginPage(message = "") {
+  const hasError = Boolean(message);
+  const safeMessage = hasError ? escapeHTML(message) : "";
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>\u7BA1\u7406\u5458\u767B\u5F55</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+    body { display: flex; justify-content: center; align-items: center; background-color: #f8f9fa; padding: 1rem; }
+    .login-container {
+      background-color: white; padding: 2rem; border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); width: 100%; max-width: 380px;
+      animation: fadeIn 0.5s ease-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .login-title { font-size: 1.75rem; font-weight: 700; text-align: center; margin: 0 0 1.5rem 0; color: #333; }
+    .form-group { margin-bottom: 1.25rem; }
+    label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #555; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 0.875rem 1rem; border: 1px solid #ddd; border-radius: 6px;
+      font-size: 1rem; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus { border-color: #7209b7; outline: none; box-shadow: 0 0 0 3px rgba(114, 9, 183, 0.15); }
+    button {
+      width: 100%; padding: 0.875rem; background-color: #7209b7; color: white; border: none;
+      border-radius: 6px; font-size: 1rem; font-weight: 500; cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    button:hover { background-color: #5a067c; }
+    button:active { transform: scale(0.98); }
+    .error-message { color: #dc3545; font-size: 0.875rem; margin-top: 0.5rem; text-align: center; }
+    .back-link { display: block; text-align: center; margin-top: 1.5rem; color: #7209b7; text-decoration: none; font-size: 0.875rem; }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1 class="login-title">\u7BA1\u7406\u5458\u767B\u5F55</h1>
+    <form method="post" action="/admin/login" novalidate>
+      <div class="form-group">
+        <label for="username">\u7528\u6237\u540D</label>
+        <input type="text" id="username" name="username" required autocomplete="username" autofocus>
+      </div>
+      <div class="form-group">
+        <label for="password">\u5BC6\u7801</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+      </div>
+      <div class="form-group">
+        <label for="duration">\u767B\u5F55\u6709\u6548\u671F</label>
+        <select id="duration" name="duration" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; background-color: white;">
+          <option value="1">1 \u5929</option>
+          <option value="7">7 \u5929</option>
+          <option value="30">30 \u5929</option>
+          <option value="60">60 \u5929</option>
+          <option value="90">90 \u5929</option>
+        </select>
+      </div>
+      ${hasError ? `<div class="error-message">${safeMessage}</div>` : ""}
+      <button type="submit">\u767B \u5F55</button>
+    </form>
+    <a href="/" class="back-link">\u8FD4\u56DE\u9996\u9875</a>
+  </div>
+  <script>
+    // \u8C03\u8BD5\u4FE1\u606F
+    console.log('Login page loaded');
+    
+    const durationSelect = document.getElementById('duration');
+    // Restore selection
+    const savedDuration = localStorage.getItem('login_duration');
+    if (savedDuration) {
+        durationSelect.value = savedDuration;
+    }
+
+    // \u68C0\u6D4B\u8868\u5355\u63D0\u4EA4
+    document.querySelector('form').addEventListener('submit', function(e) {
+      console.log('Form submitting...');
+      const name = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      // Save selection
+      localStorage.setItem('login_duration', durationSelect.value);
+
+      console.log('Username:', name);
+      console.log('Password length:', password.length);
+    });
+  <\/script>
+</body>
+</html>`;
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" }
+  });
+}
+__name(renderLoginPage, "renderLoginPage");
+async function onRequestGet4(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const error = url.searchParams.get("error");
+  console.log("GET /admin/login");
+  return renderLoginPage(error || "");
+}
+__name(onRequestGet4, "onRequestGet");
+async function onRequestPost6(context) {
+  const { request, env } = context;
+  console.log("POST /admin/login");
+  try {
+    const formData = await request.formData();
+    const name = (formData.get("username") || "").trim();
+    const password = (formData.get("password") || "").trim();
+    const durationDays = parseInt(formData.get("duration") || "1", 10);
+    const ttl = durationDays * 86400;
+    console.log("Login attempt - Username:", name, "Duration:", durationDays, "days");
+    if (!name || !password) {
+      console.log("Missing credentials");
+      return renderLoginPage("\u8BF7\u8F93\u5165\u7528\u6237\u540D\u548C\u5BC6\u7801");
+    }
+    const storedUsername = await env.NAV_AUTH.get("admin_username");
+    const storedPassword = await env.NAV_AUTH.get("admin_password");
+    console.log("Stored username exists:", Boolean(storedUsername));
+    console.log("Stored password exists:", Boolean(storedPassword));
+    if (!storedUsername || !storedPassword) {
+      console.error("Admin credentials not found in KV");
+      return renderLoginPage("\u7CFB\u7EDF\u914D\u7F6E\u9519\u8BEF\uFF0C\u8BF7\u8054\u7CFB\u7BA1\u7406\u5458");
+    }
+    const isValid = name === storedUsername && password === storedPassword;
+    if (isValid) {
+      console.log("Login successful, creating session");
+      const token = await createAdminSession(env, ttl);
+      console.log("Session token created:", token.substring(0, 8) + "...");
+      return new Response(null, {
+        status: 302,
+        headers: {
+          "Location": "/admin",
+          "Set-Cookie": buildSessionCookie(token, { maxAge: ttl })
+        }
+      });
+    }
+    console.log("Invalid credentials");
+    return renderLoginPage("\u8D26\u53F7\u6216\u5BC6\u7801\u9519\u8BEF\uFF0C\u8BF7\u91CD\u8BD5");
+  } catch (e) {
+    console.error("Login error:", e);
+    return renderLoginPage("\u767B\u5F55\u5904\u7406\u51FA\u9519: " + e.message);
+  }
+}
+__name(onRequestPost6, "onRequestPost");
+
+// api/ai-chat.js
+async function onRequestPost7(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const { messages } = await request.json();
+    if (!messages || !Array.isArray(messages)) {
+      return errorResponse("Messages array is required", 400);
+    }
+    const keys = ["provider", "apiKey", "baseUrl", "model"];
+    const { results } = await env.NAV_DB.prepare(
+      `SELECT key, value FROM settings WHERE key IN (${keys.map(() => "?").join(",")})`
+    ).bind(...keys).all();
+    const settings = {};
+    if (results) {
+      results.forEach((row) => {
+        settings[row.key] = row.value;
+      });
+    }
+    const provider = settings.provider || "workers-ai";
+    const apiKey = settings.apiKey;
+    const baseUrl = settings.baseUrl;
+    const model = settings.model;
+    if (provider === "workers-ai") {
+      if (!env.AI) {
+        return errorResponse("Workers AI binding (env.AI) not found", 500);
+      }
+      const workerModel = env.WORKERS_AI_MODEL || "@cf/mistralai/mistral-small-3.1-24b-instruct";
+      const response = await env.AI.run(workerModel, { messages });
+      return jsonResponse({
+        code: 200,
+        data: response.response || response
+      });
+    } else if (provider === "openai") {
+      if (!apiKey) return errorResponse("OpenAI API Key \u672A\u5728\u8BBE\u7F6E\u4E2D\u914D\u7F6E", 500);
+      if (!baseUrl) return errorResponse("OpenAI Base URL \u672A\u5728\u8BBE\u7F6E\u4E2D\u914D\u7F6E", 500);
+      const openaiUrl = `${baseUrl.replace(/\/+$/, "")}/v1/chat/completions`;
+      const aiResponse = await fetch(openaiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model || "gpt-3.5-turbo",
+          messages,
+          temperature: 0.7
+        })
+      });
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text();
+        return errorResponse(`OpenAI API Error: ${errText}`, 500);
+      }
+      const data = await aiResponse.json();
+      const content = data.choices?.[0]?.message?.content || "";
+      return jsonResponse({
+        code: 200,
+        data: content
+      });
+    } else if (provider === "gemini") {
+      if (!apiKey) return errorResponse("Gemini API Key \u672A\u5728\u8BBE\u7F6E\u4E2D\u914D\u7F6E", 500);
+      const geminiModel = model || "gemini-1.5-flash";
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
+      const contents = messages.filter((m) => m.role !== "system").map((m) => ({
+        role: m.role === "user" ? "user" : "model",
+        parts: [{ text: m.content }]
+      }));
+      const systemMsg = messages.find((m) => m.role === "system");
+      const payload = {
+        contents,
+        generationConfig: { temperature: 0.7 }
+      };
+      if (systemMsg) {
+        payload.systemInstruction = { parts: [{ text: systemMsg.content }] };
+      }
+      const aiResponse = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text();
+        return errorResponse(`Gemini API Error: ${errText}`, 500);
+      }
+      const data = await aiResponse.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      return jsonResponse({
+        code: 200,
+        data: content
+      });
+    } else {
+      return errorResponse(`Unsupported provider: ${provider}`, 400);
+    }
+  } catch (e) {
+    console.error("AI Chat API error:", e);
+    return errorResponse(`Server Error: ${e.message}`, 500);
+  }
+}
+__name(onRequestPost7, "onRequestPost");
+
+// api/categories/index.js
+var columnsChecked = false;
+async function onRequestGet5(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  if (!columnsChecked) {
+    try {
+      await env.NAV_DB.prepare("SELECT parent_id FROM category LIMIT 1").first();
+      try {
+        await env.NAV_DB.prepare("SELECT is_private FROM category LIMIT 1").first();
+      } catch (e) {
+        await env.NAV_DB.prepare("ALTER TABLE category ADD COLUMN is_private INTEGER DEFAULT 0").run();
+      }
+      columnsChecked = true;
+    } catch (e) {
+      try {
+        await env.NAV_DB.prepare("ALTER TABLE category ADD COLUMN parent_id INTEGER DEFAULT 0").run();
+        await env.NAV_DB.prepare("ALTER TABLE category ADD COLUMN is_private INTEGER DEFAULT 0").run();
+        columnsChecked = true;
+      } catch (e2) {
+        console.error("Failed to add columns", e2);
+      }
+    }
+  }
+  const url = new URL(request.url);
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
+  const pageSize = parseInt(url.searchParams.get("pageSize") || "10", 10);
+  const offset = (page - 1) * pageSize;
+  try {
+    const { results } = await env.NAV_DB.prepare(`
+        SELECT c.id, c.catelog, c.sort_order, c.parent_id, c.is_private, COUNT(s.id) AS site_count
+        FROM category c
+        LEFT JOIN sites s ON c.id = s.catelog_id
+        GROUP BY c.id, c.catelog, c.sort_order, c.parent_id
+        ORDER BY c.sort_order ASC, c.create_time DESC
+        LIMIT ? OFFSET ?
+      `).bind(pageSize, offset).all();
+    const countResult = await env.NAV_DB.prepare(`
+      SELECT COUNT(*) as total FROM category
+    `).first();
+    const total = countResult ? countResult.total : 0;
+    return jsonResponse({
+      code: 200,
+      data: results,
+      total,
+      page,
+      pageSize
+    });
+  } catch (e) {
+    return errorResponse(`Failed to fetch categories: ${e.message}`, 500);
+  }
+}
+__name(onRequestGet5, "onRequestGet");
+
+// api/config/index.js
+var indexesChecked = false;
+async function onRequestGet6(context) {
+  const { request, env } = context;
+  if (!indexesChecked) {
+    try {
+      await env.NAV_DB.batch([
+        env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_catelog_id ON sites(catelog_id)"),
+        env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_sort_order ON sites(sort_order)")
+      ]);
+      try {
+        await env.NAV_DB.prepare("SELECT is_private FROM sites LIMIT 1").first();
+      } catch (e) {
+        await env.NAV_DB.prepare("ALTER TABLE sites ADD COLUMN is_private INTEGER DEFAULT 0").run();
+      }
+      try {
+        await env.NAV_DB.prepare("SELECT catelog_name FROM sites LIMIT 1").first();
+      } catch (e) {
+        await env.NAV_DB.prepare("ALTER TABLE sites ADD COLUMN catelog_name TEXT").run();
+        await env.NAV_DB.prepare(`
+            UPDATE sites 
+            SET catelog_name = (SELECT catelog FROM category WHERE category.id = sites.catelog_id) 
+            WHERE catelog_name IS NULL
+          `).run();
+      }
+      indexesChecked = true;
+    } catch (e) {
+      console.error("Failed to ensure indexes or columns:", e);
+    }
+  }
+  const url = new URL(request.url);
+  const catalog = url.searchParams.get("catalog");
+  const catalogId = url.searchParams.get("catalogId");
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
+  const pageSize = parseInt(url.searchParams.get("pageSize") || "10", 10);
+  const keyword = url.searchParams.get("keyword");
+  const offset = (page - 1) * pageSize;
+  const isAuthenticated = await isAdminAuthenticated(request, env);
+  const includePrivate = isAuthenticated ? 1 : 0;
+  try {
+    let queryBase = `FROM sites s WHERE (s.is_private = 0 OR ? = 1)`;
+    let queryBindParams = [includePrivate];
+    if (catalogId) {
+      queryBase += ` AND s.catelog_id = ?`;
+      queryBindParams.push(catalogId);
+    } else if (catalog) {
+      queryBase += ` AND s.catelog_name = ?`;
+      queryBindParams.push(catalog);
+    }
+    if (keyword) {
+      queryBase += ` AND (name LIKE ? OR url LIKE ? OR catelog_name LIKE ? OR s.desc LIKE ?)`;
+      queryBindParams.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
+    }
+    const query = `SELECT * ${queryBase} ORDER BY sort_order ASC, create_time DESC LIMIT ? OFFSET ?`;
+    const countQuery = `SELECT COUNT(*) as total ${queryBase}`;
+    const fullBindParams = [...queryBindParams, pageSize, offset];
+    const { results } = await env.NAV_DB.prepare(query).bind(...fullBindParams).all();
+    let total = 0;
+    if (pageSize >= 1e3) {
+      total = results.length + offset;
+    } else {
+      const countResult = await env.NAV_DB.prepare(countQuery).bind(...queryBindParams).first();
+      total = countResult ? countResult.total : 0;
+    }
+    return jsonResponse({
+      code: 200,
+      data: results,
+      total,
+      page,
+      pageSize
+    });
+  } catch (e) {
+    return errorResponse(`Failed to fetch config data: ${e.message}`, 500);
+  }
+}
+__name(onRequestGet6, "onRequestGet");
+async function onRequestPost8(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const config = await request.json();
+    const { name, url, logo, desc, catelogId, sort_order, is_private } = config;
+    const iconAPI = env.ICON_API || "https://faviconsnap.com/api/favicon?url=";
+    const sanitizedName = (name || "").trim();
+    const sanitizedUrl = (url || "").trim();
+    let sanitizedLogo = (logo || "").trim() || null;
+    const sanitizedDesc = (desc || "").trim() || null;
+    const sortOrderValue = normalizeSortOrder(sort_order);
+    const isPrivateValue = is_private ? 1 : 0;
+    if (!sanitizedName || !sanitizedUrl || !catelogId) {
+      return errorResponse("Name, URL and Catelog are required", 400);
+    }
+    const existingSite = await env.NAV_DB.prepare("SELECT id FROM sites WHERE url = ?").bind(sanitizedUrl).first();
+    if (existingSite) {
+      return errorResponse("\u8BE5 URL \u5DF2\u5B58\u5728\uFF0C\u8BF7\u52FF\u91CD\u590D\u6DFB\u52A0", 409);
+    }
+    if (!logo && url) {
+      if (url.startsWith("https://") || url.startsWith("http://")) {
+        const domain = url.replace(/^https?:\/\//, "").split("/")[0];
+        sanitizedLogo = iconAPI + domain;
+      }
+    }
+    const categoryResult = await env.NAV_DB.prepare("SELECT catelog, is_private FROM category WHERE id = ?").bind(catelogId).first();
+    if (!categoryResult) {
+      return errorResponse(`Category not found.`, 400);
+    }
+    let finalIsPrivate = isPrivateValue;
+    if (categoryResult.is_private === 1) {
+      finalIsPrivate = 1;
+    }
+    const insert = await env.NAV_DB.prepare(`
+      INSERT INTO sites (name, url, logo, desc, catelog_id, catelog_name, sort_order, is_private)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(sanitizedName, sanitizedUrl, sanitizedLogo, sanitizedDesc, catelogId, categoryResult.catelog, sortOrderValue, finalIsPrivate).run();
+    return jsonResponse({
+      code: 201,
+      message: "Config created successfully",
+      insert
+    }, 201);
+  } catch (e) {
+    return errorResponse(`Failed to create config: ${e.message}`, 500);
+  }
+}
+__name(onRequestPost8, "onRequestPost");
+
+// api/get-empty-desc-sites.js
+async function onRequestGet7(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const { results } = await env.NAV_DB.prepare(
+      "SELECT id, name, url , logo FROM sites WHERE desc IS NULL OR desc = ''"
+    ).all();
+    return jsonResponse({
+      code: 200,
+      data: results
+    });
+  } catch (e) {
+    console.error("Error fetching sites with empty description:", e);
+    return errorResponse(`Failed to fetch sites: ${e.message}`, 500);
+  }
+}
+__name(onRequestGet7, "onRequestGet");
+
+// api/pending/index.js
+async function onRequestGet8(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  const url = new URL(request.url);
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
+  const pageSize = parseInt(url.searchParams.get("pageSize") || "10", 10);
+  const offset = (page - 1) * pageSize;
+  try {
+    const { results } = await env.NAV_DB.prepare(`
+      SELECT p.*, c.catelog
+      FROM pending_sites p
+      LEFT JOIN category c ON p.catelog_id = c.id
+      ORDER BY p.create_time DESC
+      LIMIT ? OFFSET ?
+    `).bind(pageSize, offset).all();
+    const countResult = await env.NAV_DB.prepare(`
+      SELECT COUNT(*) as total FROM pending_sites
+    `).first();
+    const total = countResult ? countResult.total : 0;
+    return jsonResponse({
+      code: 200,
+      data: results,
+      total,
+      page,
+      pageSize
+    });
+  } catch (e) {
+    return errorResponse(`Failed to fetch pending config data: ${e.message}`, 500);
+  }
+}
+__name(onRequestGet8, "onRequestGet");
+
+// api/public-config.js
+async function onRequestGet9({ env }) {
+  const submissionEnabled = String(env.ENABLE_PUBLIC_SUBMISSION) === "true";
+  const aiRequestDelay = parseInt(env.AI_REQUEST_DELAY, 10);
+  const validAiRequestDelay = !isNaN(aiRequestDelay) && aiRequestDelay > 0 ? aiRequestDelay : 1500;
+  let layoutSettings = {
+    layout_hide_desc: false,
+    layout_hide_links: false,
+    layout_hide_category: false,
+    layout_hide_title: false,
+    home_title_size: "",
+    home_title_color: "",
+    layout_hide_subtitle: false,
+    home_subtitle_size: "",
+    home_subtitle_color: "",
+    home_hide_stats: false,
+    home_stats_size: "",
+    home_stats_color: "",
+    home_hide_hitokoto: false,
+    home_hitokoto_size: "",
+    home_hitokoto_color: "",
+    layout_grid_cols: "4",
+    layout_custom_wallpaper: "",
+    layout_menu_layout: "horizontal",
+    layout_enable_frosted_glass: false,
+    layout_frosted_glass_intensity: "15",
+    layout_enable_bg_blur: false,
+    layout_bg_blur_intensity: "0"
+  };
+  try {
+    const keys = [
+      "layout_hide_desc",
+      "layout_hide_links",
+      "layout_hide_category",
+      "layout_hide_title",
+      "layout_hide_subtitle",
+      "layout_grid_cols",
+      "layout_custom_wallpaper",
+      "layout_menu_layout",
+      "layout_enable_frosted_glass",
+      "layout_frosted_glass_intensity",
+      "layout_enable_bg_blur",
+      "layout_bg_blur_intensity",
+      "home_title_size",
+      "home_title_color",
+      "home_subtitle_size",
+      "home_subtitle_color",
+      "home_hide_stats",
+      "home_stats_size",
+      "home_stats_color",
+      "home_hide_hitokoto",
+      "home_hitokoto_size",
+      "home_hitokoto_color",
+      "home_default_category"
+    ];
+    const placeholders = keys.map(() => "?").join(",");
+    const { results } = await env.NAV_DB.prepare(`SELECT key, value FROM settings WHERE key IN (${placeholders})`).bind(...keys).all();
+    if (results) {
+      results.forEach((row) => {
+        const boolKeys = ["layout_hide_desc", "layout_hide_links", "layout_hide_category", "layout_hide_title", "layout_hide_subtitle", "layout_enable_frosted_glass", "layout_enable_bg_blur", "home_hide_stats", "home_hide_hitokoto"];
+        if (boolKeys.includes(row.key)) {
+          layoutSettings[row.key] = row.value === "true";
+        } else {
+          layoutSettings[row.key] = row.value;
+        }
+      });
+    }
+  } catch (e) {
+  }
+  return jsonResponse({
+    submissionEnabled,
+    aiRequestDelay: validAiRequestDelay,
+    ...layoutSettings
+  });
+}
+__name(onRequestGet9, "onRequestGet");
+
+// api/settings.js
+async function onRequestGet10(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const { results } = await env.NAV_DB.prepare("SELECT key, value FROM settings").all();
+    const settings = {};
+    if (results) {
+      results.forEach((row) => {
+        if (row.key === "has_api_key" || row.key === "debug_api_key_info") {
+          return;
+        }
+        if (row.key === "apiKey") {
+          if (row.value && row.value.length > 0) {
+            settings["has_api_key"] = true;
+          } else {
+            settings["has_api_key"] = false;
+          }
+        } else {
+          settings[row.key] = row.value;
+        }
+      });
+    }
+    return jsonResponse({
+      code: 200,
+      data: settings
+    });
+  } catch (e) {
+    if (e.message && (e.message.includes("no such table") || e.message.includes("settings"))) {
+      return jsonResponse({
+        code: 200,
+        data: {}
+        // No settings yet
+      });
+    }
+    return errorResponse(`Failed to fetch settings: ${e.message}`, 500);
+  }
+}
+__name(onRequestGet10, "onRequestGet");
+async function onRequestPost9(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const body = await request.json();
+    const settings = body;
+    if (!settings || typeof settings !== "object") {
+      return errorResponse("Invalid settings data", 400);
+    }
+    try {
+      await env.NAV_DB.prepare(`
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        `).run();
+    } catch (e) {
+      console.error("Failed to ensure settings table:", e);
+    }
+    const stmt = env.NAV_DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
+    const batch = [];
+    for (const [key, value] of Object.entries(settings)) {
+      if (key === "has_api_key" || key === "debug_api_key_info") continue;
+      batch.push(stmt.bind(key, String(value)));
+    }
+    if (batch.length > 0) {
+      await env.NAV_DB.batch(batch);
+    }
+    return jsonResponse({
+      code: 200,
+      message: "Settings saved"
+    });
+  } catch (e) {
+    return errorResponse(`Failed to save settings: ${e.message}`, 500);
+  }
+}
+__name(onRequestPost9, "onRequestPost");
+
+// api/update-description.js
+async function onRequestPost10(context) {
+  const { request, env } = context;
+  if (!await isAdminAuthenticated(request, env)) {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const { id, description, url, logo } = await request.json();
+    if (!id || typeof description !== "string") {
+      return errorResponse("Bookmark ID and description are required", 400);
+    }
+    const iconAPI = env.ICON_API || "https://faviconsnap.com/api/favicon?url=";
+    let sanitizedLogo = (logo || "").trim() || null;
+    if (!logo && url) {
+      if (url.startsWith("https://") || url.startsWith("http://")) {
+        const domain = url.replace(/^https?:\/\//, "").split("/")[0];
+        sanitizedLogo = iconAPI + domain;
+      }
+    }
+    console.log("Sanitized Logo URL:", sanitizedLogo);
+    const result = await env.NAV_DB.prepare(
+      "UPDATE sites SET desc = ?, logo = ?, update_time = CURRENT_TIMESTAMP WHERE id = ?"
+    ).bind(description, sanitizedLogo, id).run();
+    if (result.changes === 0) {
+      return errorResponse("Bookmark not found or no changes made", 404);
+    }
+    return jsonResponse({
+      code: 200,
+      message: "Description updated successfully"
+    });
+  } catch (e) {
+    console.error("Error updating description:", e);
+    return errorResponse(`Failed to update description: ${e.message}`, 500);
+  }
+}
+__name(onRequestPost10, "onRequestPost");
+
+// api/wallpaper.js
+async function onRequestGet11(context) {
+  const { request } = context;
+  const url = new URL(request.url);
+  const source = url.searchParams.get("source") || "bing";
+  const cid = url.searchParams.get("cid") || "36";
+  const country = url.searchParams.get("country") || "";
+  const indexStr = url.searchParams.get("index") || "-1";
+  let currentIndex = parseInt(indexStr);
+  if (isNaN(currentIndex)) currentIndex = -1;
+  try {
+    let targetUrl = "";
+    let nextIndex = 0;
+    if (source === "360") {
+      const apiUrl = `http://cdn.apc.360.cn/index.php?c=WallPaper&a=getAppsByCategory&from=360chrome&cid=${cid}&start=0&count=8`;
+      const res = await fetch(apiUrl);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.errno === "0" && json.data && json.data.length > 0) {
+          nextIndex = (currentIndex + 1) % json.data.length;
+          const targetItem = json.data[nextIndex];
+          if (targetItem.url) {
+            targetUrl = targetItem.url.replace("http://", "https://");
+          }
+        }
+      }
+    } else {
+      let bingUrl = "";
+      if (country === "spotlight") {
+        bingUrl = "https://peapix.com/spotlight/feed?n=7";
+      } else {
+        bingUrl = `https://peapix.com/bing/feed?n=7&country=${country}`;
+      }
+      const res = await fetch(bingUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          nextIndex = (currentIndex + 1) % data.length;
+          const targetItem = data[nextIndex];
+          targetUrl = targetItem.fullUrl || targetItem.url;
+        }
+      }
+    }
+    if (targetUrl) {
+      return jsonResponse({
+        code: 200,
+        data: {
+          url: targetUrl,
+          index: nextIndex
+        }
+      });
+    } else {
+      return errorResponse("Failed to fetch wallpaper", 500);
+    }
+  } catch (e) {
+    return errorResponse(`Error: ${e.message}`, 500);
+  }
+}
+__name(onRequestGet11, "onRequestGet");
+
+// admin/logout.js
+async function validateAdminSession(request, env) {
+  const cookie = request.headers.get("Cookie");
+  if (!cookie) return { authenticated: false };
+  const match2 = cookie.match(/admin_session=([^;]+)/);
+  if (!match2) return { authenticated: false };
+  const token = match2[1];
+  const session = await env.NAV_AUTH.get(`session_${token}`);
+  return session ? { authenticated: true, token } : { authenticated: false };
+}
+__name(validateAdminSession, "validateAdminSession");
+async function destroyAdminSession(env, token) {
+  await env.NAV_AUTH.delete(`session_${token}`);
+}
+__name(destroyAdminSession, "destroyAdminSession");
+function buildSessionCookie2(token, options = {}) {
+  const maxAge = options.maxAge !== void 0 ? options.maxAge : 86400;
+  return `admin_session=${token}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Lax`;
+}
+__name(buildSessionCookie2, "buildSessionCookie");
+async function onRequest2(context) {
+  const { request, env } = context;
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const { token } = await validateAdminSession(request, env);
+  if (token) {
+    await destroyAdminSession(env, token);
+  }
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: "/admin",
+      "Set-Cookie": buildSessionCookie2("", { maxAge: 0 })
+    }
+  });
+}
+__name(onRequest2, "onRequest");
+
+// admin/index.js
+async function validateAdminSession2(request, env) {
+  const cookie = request.headers.get("Cookie");
+  if (!cookie) {
+    console.log("No cookie found");
+    return { authenticated: false };
+  }
+  const match2 = cookie.match(/admin_session=([^;]+)/);
+  if (!match2) {
+    console.log("No session cookie found");
+    return { authenticated: false };
+  }
+  const token = match2[1];
+  console.log("Validating token:", token.substring(0, 8) + "...");
+  const session = await env.NAV_AUTH.get(`session_${token}`);
+  if (session) {
+    console.log("Session valid");
+    return { authenticated: true, token };
+  } else {
+    console.log("Session invalid or expired");
+    return { authenticated: false };
+  }
+}
+__name(validateAdminSession2, "validateAdminSession");
+async function onRequestGet12(context) {
+  const { request, env } = context;
+  console.log("GET /admin");
+  const session = await validateAdminSession2(request, env);
+  if (!session.authenticated) {
+    console.log("User not authenticated, redirecting to login");
+    return new Response(null, {
+      status: 302,
+      headers: {
+        "Location": "/admin/login"
+      }
+    });
+  }
+  console.log("User authenticated, serving admin page from public/admin/index.html");
+  try {
+    const url = new URL(request.url);
+    url.pathname = "/admin/index.html";
+    const response = await env.ASSETS.fetch(url);
+    if (response.ok) {
+      return response;
+    } else {
+      console.error("Failed to load admin HTML:", response.status);
+      return new Response("\u7BA1\u7406\u9875\u9762\u52A0\u8F7D\u5931\u8D25", { status: 500 });
+    }
+  } catch (e) {
+    console.error("Error loading admin page:", e);
+    return new Response("\u7BA1\u7406\u9875\u9762\u52A0\u8F7D\u5931\u8D25: " + e.message, { status: 500 });
+  }
+}
+__name(onRequestGet12, "onRequestGet");
+
+// index.js
+function escapeHTML2(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+__name(escapeHTML2, "escapeHTML");
+function sanitizeUrl(url) {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "";
+    }
+    return parsed.href;
+  } catch {
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+    return "";
+  }
+}
+__name(sanitizeUrl, "sanitizeUrl");
+function normalizeSortOrder2(val) {
+  const num = Number(val);
+  return Number.isFinite(num) ? num : 9999;
+}
+__name(normalizeSortOrder2, "normalizeSortOrder");
+var schemaMigrated = false;
+async function ensureSchema(env) {
+  if (schemaMigrated) return;
+  const migrated = await env.NAV_AUTH.get(`schema_migrated_${SCHEMA_VERSION}`);
+  if (migrated) {
+    schemaMigrated = true;
+    return;
+  }
+  try {
+    await env.NAV_DB.batch([
+      env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_catelog_id ON sites(catelog_id)"),
+      env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_sort_order ON sites(sort_order)")
+    ]);
+    const sitesColumns = await env.NAV_DB.prepare("PRAGMA table_info(sites)").all();
+    const sitesCols = new Set(sitesColumns.results.map((c) => c.name));
+    const categoryColumns = await env.NAV_DB.prepare("PRAGMA table_info(category)").all();
+    const categoryCols = new Set(categoryColumns.results.map((c) => c.name));
+    const pendingColumns = await env.NAV_DB.prepare("PRAGMA table_info(pending_sites)").all();
+    const pendingCols = new Set(pendingColumns.results.map((c) => c.name));
+    const alterStatements = [];
+    if (!sitesCols.has("is_private")) {
+      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE sites ADD COLUMN is_private INTEGER DEFAULT 0"));
+    }
+    if (!sitesCols.has("catelog_name")) {
+      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE sites ADD COLUMN catelog_name TEXT"));
+    }
+    if (!pendingCols.has("catelog_name")) {
+      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE pending_sites ADD COLUMN catelog_name TEXT"));
+    }
+    if (!categoryCols.has("is_private")) {
+      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE category ADD COLUMN is_private INTEGER DEFAULT 0"));
+    }
+    if (!categoryCols.has("parent_id")) {
+      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE category ADD COLUMN parent_id INTEGER DEFAULT 0"));
+    }
+    if (alterStatements.length > 0) {
+      for (const stmt of alterStatements) {
+        try {
+          await stmt.run();
+        } catch (e) {
+          console.log("Column may already exist:", e.message);
+        }
+      }
+      if (!sitesCols.has("catelog_name")) {
+        await env.NAV_DB.prepare(`
+          UPDATE sites 
+          SET catelog_name = (SELECT catelog FROM category WHERE category.id = sites.catelog_id) 
+          WHERE catelog_name IS NULL
+        `).run();
+      }
+    }
+    await env.NAV_AUTH.put(`schema_migrated_${SCHEMA_VERSION}`, "true");
+    schemaMigrated = true;
+    console.log("Schema migration completed");
+  } catch (e) {
+    console.error("Schema migration failed:", e);
+  }
+}
+__name(ensureSchema, "ensureSchema");
+async function onRequest3(context) {
+  const { request, env } = context;
+  await ensureSchema(env);
+  const isAuthenticated = await isAdminAuthenticated(request, env);
+  const includePrivate = isAuthenticated ? 1 : 0;
+  const url = new URL(request.url);
+  const isHomePage = url.pathname === "/" && !url.search;
+  const cookies = request.headers.get("Cookie") || "";
+  const hasStaleCookie = cookies.includes("iori_cache_stale=1");
+  let shouldClearCookie = false;
+  const rawCommitSha = String(env.CF_PAGES_COMMIT_SHA || "").trim();
+  const hasStableDeploymentTag = rawCommitSha.length > 0;
+  const deploymentTag = String(hasStableDeploymentTag ? rawCommitSha : "nocache").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 16) || "nocache";
+  const cacheKeyPublic = "home_html_" + deploymentTag + "_public";
+  const cacheKeyPrivate = "home_html_" + deploymentTag + "_private";
+  const allowHomeCache = isHomePage && hasStableDeploymentTag;
+  if (allowHomeCache) {
+    if (isAuthenticated && hasStaleCookie) {
+      await env.NAV_AUTH.delete(cacheKeyPrivate);
+      await env.NAV_AUTH.delete(cacheKeyPublic);
+      shouldClearCookie = true;
+    } else {
+      const cacheKey = isAuthenticated ? cacheKeyPrivate : cacheKeyPublic;
+      try {
+        const cachedHtml = await env.NAV_AUTH.get(cacheKey);
+        if (cachedHtml) {
+          return new Response(cachedHtml, {
+            headers: {
+              "Content-Type": "text/html; charset=utf-8",
+              "X-Cache": "HIT"
+            }
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to read home cache:", e);
+      }
+    }
+  }
+  const categoryQuery = isAuthenticated ? "SELECT * FROM category ORDER BY sort_order ASC, id ASC" : `SELECT * FROM category
+       WHERE (CASE
+         WHEN LOWER(TRIM(CAST(is_private AS TEXT))) IN ('1', 'true') THEN 1
+         ELSE 0
+       END) = 0
+       ORDER BY sort_order ASC, id ASC`;
+  const settingsKeys = [
+    "layout_hide_desc",
+    "layout_hide_links",
+    "layout_hide_category",
+    "layout_hide_title",
+    "home_title_size",
+    "home_title_color",
+    "layout_hide_subtitle",
+    "home_subtitle_size",
+    "home_subtitle_color",
+    "home_hide_stats",
+    "home_stats_size",
+    "home_stats_color",
+    "home_hide_hitokoto",
+    "home_hitokoto_size",
+    "home_hitokoto_color",
+    "home_hide_github",
+    "home_hide_admin",
+    "home_custom_font_url",
+    "home_title_font",
+    "home_subtitle_font",
+    "home_stats_font",
+    "home_hitokoto_font",
+    "home_site_name",
+    "home_site_description",
+    "home_search_engine_enabled",
+    "home_search_engine_provider",
+    "home_theme_mode",
+    "home_theme_auto_dark_start",
+    "home_theme_auto_dark_end",
+    "home_default_category",
+    "home_remember_last_category",
+    "layout_grid_cols",
+    "layout_custom_wallpaper",
+    "layout_menu_layout",
+    "layout_random_wallpaper",
+    "bing_country",
+    "layout_enable_frosted_glass",
+    "layout_frosted_glass_intensity",
+    "layout_enable_bg_blur",
+    "layout_bg_blur_intensity",
+    "layout_card_style",
+    "layout_card_border_radius",
+    "wallpaper_source",
+    "wallpaper_cid_360",
+    "card_title_font",
+    "card_title_size",
+    "card_title_color",
+    "card_desc_font",
+    "card_desc_size",
+    "card_desc_color"
+  ];
+  const settingsPlaceholders = settingsKeys.map(() => "?").join(",");
+  const sitesQuery = `SELECT id, name, url, logo, desc, catelog_id, catelog_name, sort_order, is_private, create_time, update_time 
+                      FROM sites WHERE ((CASE
+                        WHEN LOWER(TRIM(CAST(is_private AS TEXT))) IN ('1', 'true') THEN 1
+                        ELSE 0
+                      END) = 0 OR ? = 1) 
+                      ORDER BY sort_order ASC, create_time DESC`;
+  const [categoriesResult, settingsResult, sitesResult] = await Promise.all([
+    env.NAV_DB.prepare(categoryQuery).all().catch((e) => ({ results: [], error: e })),
+    env.NAV_DB.prepare(`SELECT key, value FROM settings WHERE key IN (${settingsPlaceholders})`).bind(...settingsKeys).all().catch((e) => ({ results: [], error: e })),
+    env.NAV_DB.prepare(sitesQuery).bind(includePrivate).all().catch((e) => ({ results: [], error: e }))
+  ]);
+  let categories = categoriesResult.results || [];
+  if (categoriesResult.error) {
+    console.error("Failed to fetch categories:", categoriesResult.error);
+  }
+  const categoryMap = /* @__PURE__ */ new Map();
+  const categoryIdMap = /* @__PURE__ */ new Map();
+  const rootCategories = [];
+  categories.forEach((cat) => {
+    cat.children = [];
+    cat.sort_order = normalizeSortOrder2(cat.sort_order);
+    categoryMap.set(cat.id, cat);
+    if (cat.catelog) {
+      categoryIdMap.set(cat.catelog, cat.id);
+    }
+  });
+  categories.forEach((cat) => {
+    if (cat.parent_id && categoryMap.has(cat.parent_id)) {
+      categoryMap.get(cat.parent_id).children.push(cat);
+    } else {
+      rootCategories.push(cat);
+    }
+  });
+  const sortCats = /* @__PURE__ */ __name((cats) => {
+    cats.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+    cats.forEach((c) => sortCats(c.children));
+  }, "sortCats");
+  sortCats(rootCategories);
+  let layoutHideDesc = false;
+  let layoutHideLinks = false;
+  let layoutHideCategory = false;
+  let layoutHideTitle = false;
+  let homeTitleSize = "";
+  let homeTitleColor = "";
+  let layoutHideSubtitle = false;
+  let homeSubtitleSize = "";
+  let homeSubtitleColor = "";
+  let homeHideStats = false;
+  let homeStatsSize = "";
+  let homeStatsColor = "";
+  let homeHideHitokoto = false;
+  let homeHitokotoSize = "";
+  let homeHitokotoColor = "";
+  let homeHideGithub = false;
+  let homeHideAdmin = false;
+  let homeCustomFontUrl = "";
+  let homeTitleFont = "";
+  let homeSubtitleFont = "";
+  let homeStatsFont = "";
+  let homeHitokotoFont = "";
+  let homeSiteName = "";
+  let homeSiteDescription = "";
+  let homeSearchEngineEnabled = false;
+  let homeSearchEngineProvider = "local";
+  let homeThemeMode = "auto";
+  let homeThemeAutoDarkStart = "19";
+  let homeThemeAutoDarkEnd = "7";
+  let homeDefaultCategory = "";
+  let homeRememberLastCategory = false;
+  let layoutGridCols = "4";
+  let layoutCustomWallpaper = "";
+  let layoutMenuLayout = "horizontal";
+  let layoutRandomWallpaper = false;
+  let bingCountry = "";
+  let layoutEnableFrostedGlass = false;
+  let layoutFrostedGlassIntensity = "15";
+  let layoutEnableBgBlur = false;
+  let layoutBgBlurIntensity = "0";
+  let layoutCardStyle = "style1";
+  let layoutCardBorderRadius = "12";
+  let wallpaperSource = "bing";
+  let wallpaperCid360 = "36";
+  let cardTitleFont = "";
+  let cardTitleSize = "";
+  let cardTitleColor = "";
+  let cardDescFont = "";
+  let cardDescSize = "";
+  let cardDescColor = "";
+  if (settingsResult.results) {
+    settingsResult.results.forEach((row) => {
+      if (row.key === "layout_hide_desc") layoutHideDesc = row.value === "true";
+      if (row.key === "layout_hide_links") layoutHideLinks = row.value === "true";
+      if (row.key === "layout_hide_category") layoutHideCategory = row.value === "true";
+      if (row.key === "layout_hide_title") layoutHideTitle = row.value === "true";
+      if (row.key === "home_title_size") homeTitleSize = row.value;
+      if (row.key === "home_title_color") homeTitleColor = row.value;
+      if (row.key === "layout_hide_subtitle") layoutHideSubtitle = row.value === "true";
+      if (row.key === "home_subtitle_size") homeSubtitleSize = row.value;
+      if (row.key === "home_subtitle_color") homeSubtitleColor = row.value;
+      if (row.key === "home_hide_stats") homeHideStats = row.value === "true";
+      if (row.key === "home_stats_size") homeStatsSize = row.value;
+      if (row.key === "home_stats_color") homeStatsColor = row.value;
+      if (row.key === "home_hide_hitokoto") homeHideHitokoto = row.value === "true";
+      if (row.key === "home_hitokoto_size") homeHitokotoSize = row.value;
+      if (row.key === "home_hitokoto_color") homeHitokotoColor = row.value;
+      if (row.key === "home_hide_github") homeHideGithub = row.value === "true" || row.value === "1";
+      if (row.key === "home_hide_admin") homeHideAdmin = row.value === "true" || row.value === "1";
+      if (row.key === "home_custom_font_url") homeCustomFontUrl = row.value;
+      if (row.key === "home_title_font") homeTitleFont = row.value;
+      if (row.key === "home_subtitle_font") homeSubtitleFont = row.value;
+      if (row.key === "home_stats_font") homeStatsFont = row.value;
+      if (row.key === "home_hitokoto_font") homeHitokotoFont = row.value;
+      if (row.key === "home_site_name") homeSiteName = row.value;
+      if (row.key === "home_site_description") homeSiteDescription = row.value;
+      if (row.key === "home_search_engine_enabled") homeSearchEngineEnabled = row.value === "true";
+      if (row.key === "home_search_engine_provider") homeSearchEngineProvider = row.value;
+      if (row.key === "home_theme_mode") homeThemeMode = row.value;
+      if (row.key === "home_theme_auto_dark_start") homeThemeAutoDarkStart = row.value;
+      if (row.key === "home_theme_auto_dark_end") homeThemeAutoDarkEnd = row.value;
+      if (row.key === "home_default_category") homeDefaultCategory = row.value;
+      if (row.key === "home_remember_last_category") homeRememberLastCategory = row.value === "true";
+      if (row.key === "layout_grid_cols") layoutGridCols = row.value;
+      if (row.key === "layout_custom_wallpaper") layoutCustomWallpaper = row.value;
+      if (row.key === "layout_menu_layout") layoutMenuLayout = row.value;
+      if (row.key === "layout_random_wallpaper") layoutRandomWallpaper = row.value === "true";
+      if (row.key === "bing_country") bingCountry = row.value;
+      if (row.key === "layout_enable_frosted_glass") layoutEnableFrostedGlass = row.value === "true";
+      if (row.key === "layout_frosted_glass_intensity") layoutFrostedGlassIntensity = row.value;
+      if (row.key === "layout_enable_bg_blur") layoutEnableBgBlur = row.value === "true";
+      if (row.key === "layout_bg_blur_intensity") layoutBgBlurIntensity = row.value;
+      if (row.key === "layout_card_style") layoutCardStyle = row.value;
+      if (row.key === "layout_card_border_radius") layoutCardBorderRadius = row.value;
+      if (row.key === "wallpaper_source") wallpaperSource = row.value;
+      if (row.key === "wallpaper_cid_360") wallpaperCid360 = row.value;
+      if (row.key === "card_title_font") cardTitleFont = row.value;
+      if (row.key === "card_title_size") cardTitleSize = row.value;
+      if (row.key === "card_title_color") cardTitleColor = row.value;
+      if (row.key === "card_desc_font") cardDescFont = row.value;
+      if (row.key === "card_desc_size") cardDescSize = row.value;
+      if (row.key === "card_desc_color") cardDescColor = row.value;
+    });
+  }
+  const allowedSearchEngines = /* @__PURE__ */ new Set(["local", "google", "baidu", "bing"]);
+  let normalizedSearchEngine = String(homeSearchEngineProvider || "").toLowerCase();
+  if (!allowedSearchEngines.has(normalizedSearchEngine)) {
+    normalizedSearchEngine = homeSearchEngineEnabled ? "baidu" : "local";
+  }
+  homeSearchEngineProvider = normalizedSearchEngine;
+  homeThemeMode = String(homeThemeMode || "").toLowerCase() === "manual" ? "manual" : "auto";
+  const normalizeThemeHour = /* @__PURE__ */ __name((value, fallback) => {
+    const parsed = Number.parseInt(String(value ?? ""), 10);
+    if (Number.isNaN(parsed) || parsed < 0 || parsed > 23) {
+      return String(fallback);
+    }
+    return String(parsed);
+  }, "normalizeThemeHour");
+  homeThemeAutoDarkStart = normalizeThemeHour(homeThemeAutoDarkStart, 19);
+  homeThemeAutoDarkEnd = normalizeThemeHour(homeThemeAutoDarkEnd, 7);
+  let allSites = sitesResult.results || [];
+  if (sitesResult.error) {
+    return new Response(`Failed to fetch sites: ${sitesResult.error.message}`, { status: 500 });
+  }
+  let requestedCatalogName = (url.searchParams.get("catalog") || "").trim();
+  const explicitAll = requestedCatalogName.toLowerCase() === "all";
+  if (explicitAll) {
+    requestedCatalogName = "";
+  }
+  let targetCategoryIds = [];
+  let currentCatalogName = "";
+  const catalogExists = requestedCatalogName && categoryIdMap.has(requestedCatalogName);
+  if (catalogExists) {
+    const rootId = categoryIdMap.get(requestedCatalogName);
+    currentCatalogName = requestedCatalogName;
+    targetCategoryIds.push(rootId);
+  }
+  let sites = [];
+  if (targetCategoryIds.length > 0) {
+    sites = allSites.filter((site) => targetCategoryIds.includes(site.catelog_id));
+  } else {
+    sites = allSites;
+  }
+  let nextWallpaperIndex = 0;
+  if (layoutRandomWallpaper) {
+    try {
+      const cookies2 = request.headers.get("Cookie") || "";
+      const match2 = cookies2.match(/wallpaper_index=(\d+)/);
+      const currentWallpaperIndex = match2 ? parseInt(match2[1]) : -1;
+      if (wallpaperSource === "360") {
+        const cid = wallpaperCid360 || "36";
+        const apiUrl = `http://cdn.apc.360.cn/index.php?c=WallPaper&a=getAppsByCategory&from=360chrome&cid=${cid}&start=0&count=8`;
+        const res = await fetch(apiUrl);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.errno === "0" && json.data && json.data.length > 0) {
+            nextWallpaperIndex = (currentWallpaperIndex + 1) % json.data.length;
+            const targetItem = json.data[nextWallpaperIndex];
+            let targetUrl = targetItem.url;
+            if (targetUrl) {
+              targetUrl = targetUrl.replace("http://", "https://");
+              layoutCustomWallpaper = targetUrl;
+            }
+          }
+        }
+      } else {
+        let bingUrl = "";
+        if (bingCountry === "spotlight") {
+          bingUrl = "https://peapix.com/spotlight/feed?n=7";
+        } else {
+          bingUrl = `https://peapix.com/bing/feed?n=7&country=${bingCountry}`;
+        }
+        const res = await fetch(bingUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            nextWallpaperIndex = (currentWallpaperIndex + 1) % data.length;
+            const targetItem = data[nextWallpaperIndex];
+            const targetUrl = targetItem.fullUrl || targetItem.url;
+            if (targetUrl) {
+              layoutCustomWallpaper = targetUrl;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Random Wallpaper Error:", e);
+    }
+  }
+  const isCustomWallpaper = Boolean(layoutCustomWallpaper);
+  const themeClass = isCustomWallpaper ? "custom-wallpaper" : "";
+  let headerClass = isCustomWallpaper ? "bg-transparent border-none shadow-none transition-colors duration-300" : "bg-primary-700 text-white border-b border-primary-600 shadow-sm dark:bg-gray-900 dark:border-gray-800";
+  let containerClass = isCustomWallpaper ? "rounded-2xl" : "rounded-2xl border border-primary-100/60 bg-white/80 backdrop-blur-sm shadow-sm dark:bg-gray-800/80 dark:border-gray-700";
+  const titleColorClass = isCustomWallpaper ? "text-gray-900 dark:text-gray-100" : "text-white";
+  const subTextColorClass = isCustomWallpaper ? "text-gray-600 dark:text-gray-300" : "text-primary-100/90 dark:text-gray-400";
+  const searchInputClass = isCustomWallpaper ? "bg-white/90 backdrop-blur border border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-primary-200 focus:border-primary-400 focus:bg-white dark:bg-gray-800/90 dark:border-gray-600 dark:text-gray-200 dark:focus:bg-gray-800" : "bg-white/15 text-white placeholder-primary-200 focus:ring-white/30 focus:bg-white/20 border-none dark:bg-gray-800/50 dark:text-gray-200 dark:placeholder-gray-500";
+  const searchIconClass = isCustomWallpaper ? "text-gray-400 dark:text-gray-500" : "text-primary-200 dark:text-gray-500";
+  const renderHorizontalMenu = /* @__PURE__ */ __name((cats, level = 0) => {
+    if (!cats || cats.length === 0) return "";
+    return cats.map((cat) => {
+      const isActive = currentCatalogName === cat.catelog;
+      const hasChildren = cat.children && cat.children.length > 0;
+      const safeName = escapeHTML2(cat.catelog);
+      const encodedName = encodeURIComponent(cat.catelog);
+      const linkUrl = `?catalog=${encodedName}`;
+      let html2 = "";
+      if (level === 0) {
+        const activeClass = isActive ? "active" : "inactive";
+        const navItemActiveClass = isActive ? "nav-item-active" : "";
+        html2 += `<div class="menu-item-wrapper relative inline-block text-left">`;
+        html2 += `<a href="${linkUrl}" class="nav-btn ${activeClass} ${navItemActiveClass}" data-id="${cat.id}">
+
+                            ${safeName}
+
+                            ${hasChildren ? '<svg class="w-3 h-3 ml-1 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>' : ""}
+
+                         </a>`;
+        if (hasChildren) {
+          html2 += `<div class="dropdown-menu">`;
+          html2 += renderHorizontalMenu(cat.children, level + 1);
+          html2 += `</div>`;
+        }
+        html2 += `</div>`;
+      } else {
+        const activeClass = isActive ? "active" : "";
+        const navItemActiveClass = isActive ? "nav-item-active" : "";
+        html2 += `<div class="menu-item-wrapper relative block w-full">`;
+        html2 += `<a href="${linkUrl}" class="dropdown-item ${activeClass} ${navItemActiveClass}" data-id="${cat.id}">
+
+                            ${safeName}
+
+                            ${hasChildren ? '<svg class="dropdown-arrow-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>' : ""}
+
+                         </a>`;
+        if (hasChildren) {
+          html2 += `<div class="dropdown-menu">`;
+          html2 += renderHorizontalMenu(cat.children, level + 1);
+          html2 += `</div>`;
+        }
+        html2 += `</div>`;
+      }
+      return html2;
+    }).join("");
+  }, "renderHorizontalMenu");
+  const allLinkActive = !catalogExists;
+  const allLinkClass = allLinkActive ? "active" : "inactive";
+  const allLinkActiveMarker = allLinkActive ? "nav-item-active" : "";
+  const horizontalAllLink = `
+
+        <div class="menu-item-wrapper relative inline-block text-left">
+
+          <a href="?catalog=all" class="nav-btn ${allLinkClass} ${allLinkActiveMarker}">
+
+              \u5168\u90E8
+
+          </a>
+
+        </div>
+
+    `;
+  const horizontalCatalogMarkup = horizontalAllLink + renderHorizontalMenu(rootCategories);
+  const renderVerticalMenu = /* @__PURE__ */ __name((cats, level = 0) => {
+    return cats.map((cat) => {
+      const safeName = escapeHTML2(cat.catelog);
+      const encodedName = encodeURIComponent(cat.catelog);
+      const isActive = currentCatalogName === cat.catelog;
+      const baseClass = "flex items-center px-3 py-2 rounded-lg w-full transition-colors duration-200";
+      const activeClass = isActive ? "bg-secondary-100 text-primary-700 dark:bg-gray-800 dark:text-primary-400" : "hover:bg-gray-100 text-gray-700 dark:text-gray-300 dark:hover:bg-gray-800";
+      const defaultIconColor = isCustomWallpaper ? "text-gray-600" : "text-gray-400 dark:text-gray-500";
+      const iconClass = isActive ? "text-primary-600 dark:text-primary-400" : defaultIconColor;
+      const indent = level * 12;
+      let html2 = `
+
+              <a href="?catalog=${encodedName}" data-id="${cat.id}" class="${baseClass} ${activeClass}" style="padding-left: ${12 + indent}px">
+
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 ${iconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+
+                  </svg>
+
+                  ${safeName}
+
+              </a>
+
+            `;
+      if (cat.children && cat.children.length > 0) {
+        html2 += renderVerticalMenu(cat.children, level + 1);
+      }
+      return html2;
+    }).join("");
+  }, "renderVerticalMenu");
+  const catalogLinkMarkup = renderVerticalMenu(rootCategories);
+  let sitesGridMarkup = sites.map((site, index) => {
+    const rawName = site.name || "\u672A\u547D\u540D";
+    const rawCatalog = site.catelog_name || "\u672A\u5206\u7C7B";
+    const rawDesc = site.desc || "\u6682\u65E0\u63CF\u8FF0";
+    const normalizedUrl = sanitizeUrl(site.url);
+    const safeDisplayUrl = normalizedUrl || "\u672A\u63D0\u4F9B\u94FE\u63A5";
+    const logoUrl = sanitizeUrl(site.logo);
+    const cardInitial = escapeHTML2((rawName.trim().charAt(0) || "\u7AD9").toUpperCase());
+    const safeName = escapeHTML2(rawName);
+    const safeCatalog = escapeHTML2(rawCatalog);
+    const safeDesc = escapeHTML2(rawDesc);
+    const hasValidUrl = Boolean(normalizedUrl);
+    const logoHtml = logoUrl ? `<img src="${escapeHTML2(logoUrl)}" alt="${safeName}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700" decoding="async" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.classList.remove('hidden');">
+           <div class="hidden w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>` : `<div class="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`;
+    const descHtml = layoutHideDesc ? "" : `<p class="mt-2 text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2" title="${safeDesc}">${safeDesc}</p>`;
+    const linksHtml = layoutHideLinks ? "" : `
+
+  
+
+                          
+
+  
+
+                                                      <div class="mt-3 flex items-center justify-between">
+
+  
+
+                          
+
+  
+
+                                                        <span class="text-xs text-primary-600 dark:text-primary-400 truncate flex-1 min-w-0 mr-2" title="${safeDisplayUrl}">${escapeHTML2(safeDisplayUrl)}</span>
+
+  
+
+                          
+
+  
+
+                                                        <button class="copy-btn relative flex items-center px-2 py-1 ${hasValidUrl ? "bg-accent-100 text-accent-700 hover:bg-accent-200 dark:bg-accent-900/30 dark:text-accent-300 dark:hover:bg-accent-900/50" : "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"} rounded-full text-xs font-medium transition-colors" data-url="${escapeHTML2(normalizedUrl)}" ${hasValidUrl ? "" : "disabled"}>
+
+  
+
+                          
+
+  
+
+                                    
+
+  
+
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ${layoutGridCols >= "5" ? "" : "mr-1"}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+  
+
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+
+  
+
+                      </svg>
+
+  
+
+                      ${layoutGridCols >= "5" ? "" : '<span class="copy-text">\u590D\u5236</span>'}
+
+  
+
+                      <span class="copy-success hidden absolute -top-8 right-0 bg-accent-500 text-white text-xs px-2 py-1 rounded shadow-md">\u5DF2\u590D\u5236!</span>
+
+  
+
+                    </button>
+
+  
+
+                  </div>`;
+    const categoryHtml = layoutHideCategory ? "" : `
+
+  
+
+                        <span class="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-secondary-100 text-primary-700 dark:bg-secondary-800 dark:text-primary-300">
+
+  
+
+                          ${safeCatalog}
+
+  
+
+                        </span>`;
+    const frostedClass = layoutEnableFrostedGlass ? "frosted-glass-effect" : "";
+    const cardStyleClass = layoutCardStyle === "style2" ? "style-2" : "";
+    const baseCardClass = layoutEnableFrostedGlass ? "site-card group h-full flex flex-col overflow-hidden transition-all" : "site-card group h-full flex flex-col bg-white border border-primary-100/60 shadow-sm overflow-hidden dark:bg-gray-800 dark:border-gray-700";
+    const delay = Math.min(index, 20) * 30;
+    const animStyle = delay > 0 ? `style="animation-delay: ${delay}ms"` : "";
+    return `
+
+  
+
+                    
+
+  
+
+                                <div class="${baseCardClass} ${frostedClass} ${cardStyleClass} card-anim-enter" ${animStyle} data-id="${site.id}" data-name="${escapeHTML2(site.name)}" data-url="${escapeHTML2(normalizedUrl)}" data-catalog-id="${escapeHTML2(String(site.catelog_id ?? ""))}" data-catalog="${escapeHTML2(site.catelog_name || site.catelog || "\u672A\u5206\u7C7B")}" data-desc="${safeDesc}">
+
+  
+
+                <div class="site-card-content">
+
+  
+
+                  <a href="${escapeHTML2(normalizedUrl || "#")}" ${hasValidUrl ? 'target="_blank" rel="noopener noreferrer"' : ""} class="block">
+
+  
+
+                    <div class="flex items-start">
+
+  
+
+                      <div class="site-icon flex-shrink-0 mr-4 transition-all duration-300">
+
+  
+
+                                                ${logoHtml}
+
+  
+
+                      </div>
+
+  
+
+                      <div class="flex-1 min-w-0">
+
+  
+
+                        <h3 class="site-title text-base font-medium text-gray-900 dark:text-gray-100 truncate transition-all duration-300 origin-left" title="${safeName}">${safeName}</h3>
+
+  
+
+                        ${categoryHtml}
+
+  
+
+                      </div>
+
+  
+
+                    </div>
+
+  
+
+                    ${descHtml}
+
+  
+
+                  </a>
+
+  
+
+                  ${linksHtml}
+
+  
+
+                </div>
+
+  
+
+              </div>
+
+  
+
+            `;
+  }).join("");
+  if (sites.length === 0) {
+    const emptyStateText = categories.length === 0 ? "\u6B22\u8FCE\u4F7F\u7528 iori-nav" : "\u6682\u65E0\u4E66\u7B7E";
+    const emptyStateSub = categories.length === 0 ? "\u9879\u76EE\u521D\u59CB\u5316\u5B8C\u6210\uFF0C\u8BF7\u524D\u5F80\u540E\u53F0\u6DFB\u52A0\u5206\u7C7B\u548C\u4E66\u7B7E\u3002" : "\u8BE5\u5206\u7C7B\u4E0B\u8FD8\u6CA1\u6709\u6DFB\u52A0\u4EFB\u4F55\u4E66\u7B7E\u3002";
+    sitesGridMarkup = `
+        <div class="col-span-full flex flex-col items-center justify-center py-24 text-center animate-fade-in">
+            <div class="w-32 h-32 mb-6 text-gray-200 dark:text-gray-700/50">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-medium text-gray-600 dark:text-gray-300 mb-2">${emptyStateText}</h3>
+            <p class="text-gray-400 dark:text-gray-500 max-w-md mx-auto mb-8">${emptyStateSub}</p>
+            ${!homeHideAdmin ? `<a href="/admin" target="_blank" class="inline-flex items-center px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition-all shadow-lg shadow-primary-600/20 hover:shadow-primary-600/40 hover:-translate-y-0.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    \u524D\u5F80\u7BA1\u7406\u540E\u53F0
+                </a>` : ""}
+        </div>
+      `;
+  }
+  let gridClass = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 justify-items-center";
+  if (layoutGridCols === "5") {
+    gridClass = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 justify-items-center";
+  } else if (layoutGridCols === "6") {
+    gridClass = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 min-[1200px]:grid-cols-6 gap-3 sm:gap-6 justify-items-center";
+  } else if (layoutGridCols === "7") {
+    gridClass = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-6 justify-items-center";
+  }
+  const datalistOptions = categories.map((cat) => `<option value="${escapeHTML2(cat.catelog)}">`).join("");
+  const headingPlainText = currentCatalogName ? `${currentCatalogName} \xB7 ${sites.length} \u4E2A\u4E66\u7B7E` : `\u5168\u90E8\u6536\u85CF \xB7 ${sites.length} \u4E2A\u4E66\u7B7E`;
+  const headingText = escapeHTML2(headingPlainText);
+  const headingDefaultAttr = escapeHTML2(headingPlainText);
+  const headingActiveAttr = catalogExists ? escapeHTML2(currentCatalogName) : "";
+  const submissionEnabled = String(env.ENABLE_PUBLIC_SUBMISSION) === "true";
+  const submissionClass = submissionEnabled ? "" : "hidden";
+  const siteName = homeSiteName || env.SITE_NAME || "Iori Nav";
+  const siteDescription = homeSiteDescription || env.SITE_DESCRIPTION || "Bookmarks navigation";
+  const footerText = env.FOOTER_TEXT || "Iori Nav";
+  const hitokotoContent = homeHideHitokoto ? "" : "...";
+  const getStyleStr = /* @__PURE__ */ __name((size, color, font) => {
+    let s = "";
+    if (size) s += `font-size: ${size}px;`;
+    if (color) s += `color: ${color} !important;`;
+    if (font) s += `font-family: ${font} !important;`;
+    return s ? `style="${s}"` : "";
+  }, "getStyleStr");
+  const titleStyle = getStyleStr(homeTitleSize, homeTitleColor, homeTitleFont);
+  const subtitleStyle = getStyleStr(homeSubtitleSize, homeSubtitleColor, homeSubtitleFont);
+  const statsStyle = getStyleStr(homeStatsSize, homeStatsColor, homeStatsFont);
+  const hitokotoStyle = getStyleStr(homeHitokotoSize, homeHitokotoColor, homeHitokotoFont);
+  const shouldRenderStatsRow = !homeHideStats || !homeHideHitokoto;
+  const statsRowPyClass = shouldRenderStatsRow ? "my-8" : "hidden";
+  const statsRowMbClass = "";
+  const statsRowHiddenClass = shouldRenderStatsRow ? "" : "hidden";
+  const horizontalTitleHtml = layoutHideTitle ? "" : `<h1 class="text-3xl md:text-4xl font-bold tracking-tight mb-3 ${titleColorClass}" ${titleStyle}>{{SITE_NAME}}</h1>`;
+  const horizontalSubtitleHtml = layoutHideSubtitle ? "" : `<p class="${subTextColorClass} opacity-90 text-sm md:text-base" ${subtitleStyle}>{{SITE_DESCRIPTION}}</p>`;
+  const searchPlaceholderMap = {
+    local: "\u641C\u7D22\u4E66\u7B7E...",
+    google: "Google \u641C\u7D22...",
+    baidu: "\u767E\u5EA6\u641C\u7D22...",
+    bing: "Bing \u641C\u7D22..."
+  };
+  const searchInputPlaceholder = searchPlaceholderMap[homeSearchEngineProvider] || searchPlaceholderMap.local;
+  const verticalHeaderContent = `
+      <div class="max-w-4xl mx-auto text-center relative z-10 ${themeClass} py-8">
+        <div class="mb-8">
+            ${horizontalTitleHtml}
+            ${horizontalSubtitleHtml}
+        </div>
+
+        <div class="relative max-w-xl mx-auto">
+            <div class="search-input-target-wrapper relative">
+                <div class="relative">
+                    <input type="text" name="search" aria-label="\u641C\u7D22" placeholder="${searchInputPlaceholder}" class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <div class="suggestion-dropdown hidden">
+                    <ul class="suggestion-list"></ul>
+                </div>
+            </div>
+        </div>
+      </div>`;
+  const horizontalHeaderContent = `
+      <div class="max-w-5xl mx-auto text-center relative z-10 ${themeClass}">
+        <div class="max-w-4xl mx-auto mb-8">
+            ${horizontalTitleHtml}
+            ${horizontalSubtitleHtml}
+        </div>
+
+        <div class="relative max-w-xl mx-auto mb-8">
+            <div class="search-input-target-wrapper relative">
+                <div class="relative">
+                    <input id="headerSearchInput" type="text" name="search" aria-label="\u641C\u7D22" placeholder="${searchInputPlaceholder}" class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <div id="suggestionDropdown" class="suggestion-dropdown hidden">
+                    <ul id="suggestionList" class="suggestion-list"></ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="relative max-w-5xl mx-auto">
+            <div id="horizontalCategoryNav" class="flex flex-wrap justify-center items-center gap-3 overflow-hidden transition-all duration-300" style="max-height: 60px;">
+                ${horizontalCatalogMarkup}
+                <div id="horizontalMoreWrapper" class="relative hidden">
+                    <button id="horizontalMoreBtn" class="nav-btn inactive">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                        </svg>
+                    </button>
+                    <div id="horizontalMoreDropdown" class="dropdown-menu hidden absolute mt-2 w-auto z-50">
+                        <!-- Dropdown items will be moved here by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+  `;
+  let sidebarClass = "";
+  let mainClass = "lg:ml-64";
+  let sidebarToggleClass = "";
+  let mobileToggleVisibilityClass = "lg:hidden";
+  let githubIconHtml = "";
+  let adminIconHtml = "";
+  let themeIconHtml = `
+    <button id="themeToggleBtn" class="flex items-center justify-center p-2 rounded-lg bg-white/80 backdrop-blur shadow-md hover:bg-white text-gray-700 hover:text-amber-500 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:text-yellow-300 transition-all cursor-pointer" title="\u5207\u6362\u4E3B\u9898">
+      <!-- Sun Icon (Light Mode) -->
+      <svg id="themeIconSun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block dark:hidden"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+      <!-- Moon Icon (Dark Mode) -->
+      <svg id="themeIconMoon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden dark:block"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
+  `;
+  let headerContent = verticalHeaderContent;
+  if (layoutMenuLayout === "horizontal") {
+    sidebarClass = "min-[550px]:hidden";
+    mainClass = "";
+    sidebarToggleClass = "!hidden";
+    mobileToggleVisibilityClass = "min-[550px]:hidden";
+    if (!homeHideGithub) {
+      githubIconHtml = `
+          <a href="https://slink.661388.xyz/iori-nav" target="_blank" class="fixed top-4 left-4 z-50 hidden min-[550px]:flex items-center justify-center p-2 rounded-lg bg-white/80 backdrop-blur shadow-md hover:bg-white text-gray-700 hover:text-black dark:bg-gray-800/80 dark:text-gray-200 dark:hover:text-white transition-all" title="GitHub">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg>
+          </a>
+          `;
+    }
+    if (!homeHideAdmin) {
+      adminIconHtml = `
+          <a href="/admin" target="_blank" class="flex items-center justify-center p-2 rounded-lg bg-white/80 backdrop-blur shadow-md hover:bg-white text-gray-700 hover:text-primary-600 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:text-primary-400 transition-all" title="\u540E\u53F0\u7BA1\u7406">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M7 18a5 5 0 0 1 10 0"/></path></svg>
+          </a>
+          `;
+    }
+    headerContent = `
+        <div class="min-[550px]:hidden">
+            ${verticalHeaderContent}
+        </div>
+        <div class="hidden min-[550px]:block">
+            ${horizontalHeaderContent}
+        </div>
+      `;
+  }
+  const topRightActionsHtml = `
+    <div class="fixed top-4 right-4 z-50 flex items-center gap-3">
+        ${themeIconHtml}
+        ${adminIconHtml}
+    </div>
+  `;
+  const sidebarGithubLinkPattern = /<a href="https:\/\/slink\.661388\.xyz\/iori-nav"[^>]*title="GitHub">[\s\S]*?<\/a>/;
+  const sidebarAdminLinkPattern = /<a href="\/admin"[^>]*>[\s\S]*?后台管理[\s\S]*?<\/a>/;
+  const leftTopActionHtml = `
+  <div class="fixed top-4 left-4 z-50 ${mobileToggleVisibilityClass}">
+    <button id="sidebarToggle" class="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-500 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  </div>
+  ${githubIconHtml}
+  `;
+  const footerClass = isCustomWallpaper ? "bg-transparent py-8 px-6 mt-12 border-none shadow-none text-black dark:text-gray-200" : "bg-white py-8 px-6 mt-12 border-t border-primary-100 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-400";
+  const hitokotoClass = (isCustomWallpaper ? "text-black dark:text-gray-200" : "text-gray-500 dark:text-gray-400") + " ml-auto";
+  const templateResponse = await env.ASSETS.fetch(new URL("/index.html", request.url));
+  let html = await templateResponse.text();
+  let hideIconsCss = "<style>";
+  if (homeHideGithub) {
+    hideIconsCss += 'a[title="GitHub"] { display: none !important; }';
+  }
+  if (homeHideAdmin) {
+    hideIconsCss += 'a[href^="/admin"] { display: none !important; }';
+  }
+  hideIconsCss += "</style>";
+  if (hideIconsCss !== "<style></style>") {
+    html = html.replace("</head>", hideIconsCss + "</head>");
+  }
+  const safeWallpaperUrl = sanitizeUrl(layoutCustomWallpaper);
+  const defaultBgColor = "#fdf8f3";
+  let bgLayerHtml = "";
+  if (safeWallpaperUrl) {
+    const blurStyle = layoutEnableBgBlur ? `filter: blur(${layoutBgBlurIntensity}px); transform: scale(1.02);` : "";
+    bgLayerHtml = `
+        <div id="fixed-background" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;">
+          <img src="${safeWallpaperUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; ${blurStyle}" />
+        </div>
+      `;
+  } else {
+    bgLayerHtml = `
+        <div id="fixed-background" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background-color: ${defaultBgColor};"></div>
+      `;
+  }
+  const globalScrollCss = `
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #app-scroll {
+        width: 100%;
+        height: 100dvh;
+        min-height: 100%;
+        overflow-y: auto; /* \u5141\u8BB8\u7EB5\u5411\u6EDA\u52A8 */
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch; /* iOS \u539F\u751F\u60EF\u6027\u6EDA\u52A8 */
+        position: relative;
+        z-index: 1;
+      }
+      body {
+        background-color: transparent !important;
+        overflow: hidden; /* \u7981\u6B62 body \u6EDA\u52A8\uFF0C\u4EA4\u7531 #app-scroll \u7BA1\u7406 */
+        min-height: 100dvh;
+        position: relative;
+      }
+      #fixed-background {
+        /* \u4EC5\u5BF9\u5FC5\u8981\u7684\u5C5E\u6027\u8FDB\u884C\u5E73\u6ED1\u8FC7\u6E21 */
+        transition: background-color 0.3s ease, filter 0.3s ease;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
+      /* \u4FEE\u590D iOS \u4E0A 100vh \u95EE\u9898 (\u9488\u5BF9\u80CC\u666F\u5C42) */
+      @supports (-webkit-touch-callout: none) {
+        #app-scroll {
+          height: -webkit-fill-available;
+          min-height: -webkit-fill-available;
+        }
+      }
+    </style>
+  `;
+  html = html.replace("</head>", `${globalScrollCss}</head>`);
+  html = html.replace('<body class="bg-secondary-50 font-sans text-gray-800">', `<body class="bg-secondary-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-100 relative ${isCustomWallpaper ? "custom-wallpaper" : ""}">${bgLayerHtml}<div id="app-scroll">`);
+  html = html.replace("</body>", "</div></body>");
+  const cardRadius = parseInt(layoutCardBorderRadius) || 12;
+  const frostedBlurRaw = String(layoutFrostedGlassIntensity || "15").replace(/[^0-9]/g, "");
+  const frostedBlur = frostedBlurRaw || "15";
+  const cardCssVars = `<style>:root { --card-padding: 1.25rem; --card-radius: ${cardRadius}px; --frosted-glass-blur: ${frostedBlur}px; }</style>`;
+  html = html.replace("</head>", `${cardCssVars}</head>`);
+  const usedFonts = /* @__PURE__ */ new Set();
+  if (!layoutHideTitle && homeTitleFont) usedFonts.add(homeTitleFont);
+  if (!layoutHideSubtitle && homeSubtitleFont) usedFonts.add(homeSubtitleFont);
+  if (!homeHideStats && homeStatsFont) usedFonts.add(homeStatsFont);
+  if (!homeHideHitokoto && homeHitokotoFont) usedFonts.add(homeHitokotoFont);
+  if (cardTitleFont) usedFonts.add(cardTitleFont);
+  if (cardDescFont) usedFonts.add(cardDescFont);
+  let fontLinksHtml = "";
+  usedFonts.forEach((font) => {
+    if (font && FONT_MAP[font]) {
+      fontLinksHtml += `<link rel="stylesheet" href="${FONT_MAP[font]}">`;
+    }
+  });
+  const safeCustomFontUrl = sanitizeUrl(homeCustomFontUrl);
+  if (safeCustomFontUrl) {
+    fontLinksHtml += `<link rel="stylesheet" href="${safeCustomFontUrl}">`;
+  }
+  if (fontLinksHtml) {
+    html = html.replace("</head>", `${fontLinksHtml}</head>`);
+  }
+  let customCardCss = "<style>";
+  if (cardTitleFont || cardTitleSize || cardTitleColor) {
+    const s = getStyleStr(cardTitleSize, cardTitleColor, cardTitleFont).replace('style="', "").replace('"', "");
+    if (s) customCardCss += `.site-title { ${s} }`;
+  }
+  if (cardDescFont || cardDescSize || cardDescColor) {
+    const s = getStyleStr(cardDescSize, cardDescColor, cardDescFont).replace('style="', "").replace('"', "");
+    if (s) customCardCss += `.site-card p { ${s} }`;
+  }
+  customCardCss += "</style>";
+  if (customCardCss !== "<style></style>") {
+    html = html.replace("</head>", `${customCardCss}</head>`);
+  }
+  const safeJson = JSON.stringify(allSites).replace(/</g, "\\u003c");
+  const globalDataScript = `
+    <script>
+      window.IORI_SITES = ${safeJson};
+    <\/script>
+  `;
+  html = html.replace("</head>", `${globalDataScript}</head>`);
+  const layoutConfigScript = `
+    <script>
+      window.IORI_LAYOUT_CONFIG = {
+        hideDesc: ${layoutHideDesc},
+        hideLinks: ${layoutHideLinks},
+        hideCategory: ${layoutHideCategory},
+        gridCols: "${layoutGridCols}",
+        cardStyle: "${layoutCardStyle}",
+        enableFrostedGlass: ${layoutEnableFrostedGlass},
+        rememberLastCategory: ${homeRememberLastCategory},
+        randomWallpaper: ${layoutRandomWallpaper},
+        wallpaperSource: "${wallpaperSource}",
+        wallpaperCid360: "${wallpaperCid360}",
+        bingCountry: "${bingCountry}",
+        searchEngine: "${homeSearchEngineProvider}",
+        themeMode: "${homeThemeMode}",
+        themeAutoDarkStart: ${homeThemeAutoDarkStart},
+        themeAutoDarkEnd: ${homeThemeAutoDarkEnd}
+      };
+    <\/script>
+  `;
+  html = html.replace("</head>", `${layoutConfigScript}</head>`);
+  html = html.replace("{{HEADER_CONTENT}}", headerContent).replace("{{HEADER_CLASS}}", headerClass).replace("{{CONTAINER_CLASS}}", containerClass).replace("{{FOOTER_CLASS}}", footerClass).replace("{{HITOKOTO_CLASS}}", hitokotoClass).replace("{{LEFT_TOP_ACTION}}", leftTopActionHtml).replace("{{RIGHT_TOP_ACTION}}", topRightActionsHtml).replace("{{THEME_MODE_DEFAULT}}", homeThemeMode).replace("{{THEME_AUTO_DARK_START}}", homeThemeAutoDarkStart).replace("{{THEME_AUTO_DARK_END}}", homeThemeAutoDarkEnd).replace(/{{SITE_NAME}}/g, escapeHTML2(siteName)).replace(/{{SITE_DESCRIPTION}}/g, escapeHTML2(siteDescription)).replace("{{FOOTER_TEXT}}", escapeHTML2(footerText)).replace("{{CATALOG_EXISTS}}", catalogExists ? "true" : "false").replace("{{CATALOG_LINKS}}", catalogLinkMarkup).replace("{{SUBMISSION_CLASS}}", submissionClass).replace("{{DATALIST_OPTIONS}}", datalistOptions).replace("{{TOTAL_SITES}}", sites.length).replace("{{CATALOG_COUNT}}", categories.length).replace("{{HEADING_TEXT}}", headingText).replace("{{HEADING_DEFAULT}}", headingDefaultAttr).replace("{{HEADING_ACTIVE}}", headingActiveAttr).replace("{{STATS_VISIBLE}}", homeHideStats ? "hidden" : "").replace("{{STATS_STYLE}}", statsStyle).replace("{{HITOKOTO_VISIBLE}}", homeHideHitokoto ? "hidden" : "").replace("{{STATS_ROW_PY_CLASS}}", statsRowPyClass).replace("{{STATS_ROW_MB_CLASS}}", statsRowMbClass).replace("{{STATS_ROW_HIDDEN}}", statsRowHiddenClass).replace("{{HITOKOTO_CONTENT}}", hitokotoContent).replace(/{{HITOKOTO_STYLE}}/g, hitokotoStyle).replace("{{SITES_GRID}}", sitesGridMarkup).replace("{{CURRENT_YEAR}}", (/* @__PURE__ */ new Date()).getFullYear()).replace("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6", gridClass).replace("{{SIDEBAR_CLASS}}", sidebarClass).replace("{{MAIN_CLASS}}", mainClass).replace("{{SIDEBAR_TOGGLE_CLASS}}", sidebarToggleClass);
+  const response = new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" }
+  });
+  if (shouldClearCookie) {
+    response.headers.append("Set-Cookie", "iori_cache_stale=; Path=/; Max-Age=0; SameSite=Lax");
+  }
+  if (allowHomeCache) {
+    const cacheKey = isAuthenticated ? cacheKeyPrivate : cacheKeyPublic;
+    context.waitUntil(env.NAV_AUTH.put(cacheKey, html));
+  }
+  return response;
+}
+__name(onRequest3, "onRequest");
+
+// ../.wrangler/tmp/pages-4LJtgm/functionsRoutes-0.5947291896216682.mjs
+var routes = [
+  {
+    routePath: "/api/cache/clear",
+    mountPath: "/api/cache",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost]
+  },
+  {
+    routePath: "/api/categories/create",
+    mountPath: "/api/categories",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost2]
+  },
+  {
+    routePath: "/api/config/batch",
+    mountPath: "/api/config",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost3]
+  },
+  {
+    routePath: "/api/config/export",
+    mountPath: "/api/config",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet]
+  },
+  {
+    routePath: "/api/config/import",
+    mountPath: "/api/config",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost4]
+  },
+  {
+    routePath: "/api/config/submit",
+    mountPath: "/api/config",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost5]
+  },
+  {
+    routePath: "/api/search/suggestions",
+    mountPath: "/api/search",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet2]
+  },
+  {
+    routePath: "/api/search/suggestions",
+    mountPath: "/api/search",
+    method: "OPTIONS",
+    middlewares: [],
+    modules: [onRequestOptions]
+  },
+  {
+    routePath: "/api/categories/:id",
+    mountPath: "/api/categories",
+    method: "PUT",
+    middlewares: [],
+    modules: [onRequestPut]
+  },
+  {
+    routePath: "/api/config/:id",
+    mountPath: "/api/config",
+    method: "DELETE",
+    middlewares: [],
+    modules: [onRequestDelete]
+  },
+  {
+    routePath: "/api/config/:id",
+    mountPath: "/api/config",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet3]
+  },
+  {
+    routePath: "/api/config/:id",
+    mountPath: "/api/config",
+    method: "PUT",
+    middlewares: [],
+    modules: [onRequestPut2]
+  },
+  {
+    routePath: "/api/pending/:id",
+    mountPath: "/api/pending",
+    method: "DELETE",
+    middlewares: [],
+    modules: [onRequestDelete2]
+  },
+  {
+    routePath: "/api/pending/:id",
+    mountPath: "/api/pending",
+    method: "PUT",
+    middlewares: [],
+    modules: [onRequestPut3]
+  },
+  {
+    routePath: "/admin/login",
+    mountPath: "/admin",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet4]
+  },
+  {
+    routePath: "/admin/login",
+    mountPath: "/admin",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost6]
+  },
+  {
+    routePath: "/api/ai-chat",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost7]
+  },
+  {
+    routePath: "/api/categories",
+    mountPath: "/api/categories",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet5]
+  },
+  {
+    routePath: "/api/config",
+    mountPath: "/api/config",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet6]
+  },
+  {
+    routePath: "/api/config",
+    mountPath: "/api/config",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost8]
+  },
+  {
+    routePath: "/api/get-empty-desc-sites",
+    mountPath: "/api",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet7]
+  },
+  {
+    routePath: "/api/pending",
+    mountPath: "/api/pending",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet8]
+  },
+  {
+    routePath: "/api/public-config",
+    mountPath: "/api",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet9]
+  },
+  {
+    routePath: "/api/settings",
+    mountPath: "/api",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet10]
+  },
+  {
+    routePath: "/api/settings",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost9]
+  },
+  {
+    routePath: "/api/update-description",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost10]
+  },
+  {
+    routePath: "/api/wallpaper",
+    mountPath: "/api",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet11]
+  },
+  {
+    routePath: "/admin/logout",
+    mountPath: "/admin",
+    method: "",
+    middlewares: [],
+    modules: [onRequest2]
+  },
+  {
+    routePath: "/admin",
+    mountPath: "/admin",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet12]
+  },
+  {
+    routePath: "/",
+    mountPath: "/",
+    method: "",
+    middlewares: [onRequest],
+    modules: [onRequest3]
+  }
+];
+
+// C:/Users/JasonPauluo/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/path-to-regexp/dist.es2015/index.js
+function lexer(str) {
+  var tokens = [];
+  var i = 0;
+  while (i < str.length) {
+    var char = str[i];
+    if (char === "*" || char === "+" || char === "?") {
+      tokens.push({ type: "MODIFIER", index: i, value: str[i++] });
+      continue;
+    }
+    if (char === "\\") {
+      tokens.push({ type: "ESCAPED_CHAR", index: i++, value: str[i++] });
+      continue;
+    }
+    if (char === "{") {
+      tokens.push({ type: "OPEN", index: i, value: str[i++] });
+      continue;
+    }
+    if (char === "}") {
+      tokens.push({ type: "CLOSE", index: i, value: str[i++] });
+      continue;
+    }
+    if (char === ":") {
+      var name = "";
+      var j = i + 1;
+      while (j < str.length) {
+        var code = str.charCodeAt(j);
+        if (
+          // `0-9`
+          code >= 48 && code <= 57 || // `A-Z`
+          code >= 65 && code <= 90 || // `a-z`
+          code >= 97 && code <= 122 || // `_`
+          code === 95
+        ) {
+          name += str[j++];
+          continue;
+        }
+        break;
+      }
+      if (!name)
+        throw new TypeError("Missing parameter name at ".concat(i));
+      tokens.push({ type: "NAME", index: i, value: name });
+      i = j;
+      continue;
+    }
+    if (char === "(") {
+      var count = 1;
+      var pattern = "";
+      var j = i + 1;
+      if (str[j] === "?") {
+        throw new TypeError('Pattern cannot start with "?" at '.concat(j));
+      }
+      while (j < str.length) {
+        if (str[j] === "\\") {
+          pattern += str[j++] + str[j++];
+          continue;
+        }
+        if (str[j] === ")") {
+          count--;
+          if (count === 0) {
+            j++;
+            break;
+          }
+        } else if (str[j] === "(") {
+          count++;
+          if (str[j + 1] !== "?") {
+            throw new TypeError("Capturing groups are not allowed at ".concat(j));
+          }
+        }
+        pattern += str[j++];
+      }
+      if (count)
+        throw new TypeError("Unbalanced pattern at ".concat(i));
+      if (!pattern)
+        throw new TypeError("Missing pattern at ".concat(i));
+      tokens.push({ type: "PATTERN", index: i, value: pattern });
+      i = j;
+      continue;
+    }
+    tokens.push({ type: "CHAR", index: i, value: str[i++] });
+  }
+  tokens.push({ type: "END", index: i, value: "" });
+  return tokens;
+}
+__name(lexer, "lexer");
+function parse(str, options) {
+  if (options === void 0) {
+    options = {};
+  }
+  var tokens = lexer(str);
+  var _a = options.prefixes, prefixes = _a === void 0 ? "./" : _a, _b = options.delimiter, delimiter = _b === void 0 ? "/#?" : _b;
+  var result = [];
+  var key = 0;
+  var i = 0;
+  var path = "";
+  var tryConsume = /* @__PURE__ */ __name(function(type) {
+    if (i < tokens.length && tokens[i].type === type)
+      return tokens[i++].value;
+  }, "tryConsume");
+  var mustConsume = /* @__PURE__ */ __name(function(type) {
+    var value2 = tryConsume(type);
+    if (value2 !== void 0)
+      return value2;
+    var _a2 = tokens[i], nextType = _a2.type, index = _a2.index;
+    throw new TypeError("Unexpected ".concat(nextType, " at ").concat(index, ", expected ").concat(type));
+  }, "mustConsume");
+  var consumeText = /* @__PURE__ */ __name(function() {
+    var result2 = "";
+    var value2;
+    while (value2 = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR")) {
+      result2 += value2;
+    }
+    return result2;
+  }, "consumeText");
+  var isSafe = /* @__PURE__ */ __name(function(value2) {
+    for (var _i = 0, delimiter_1 = delimiter; _i < delimiter_1.length; _i++) {
+      var char2 = delimiter_1[_i];
+      if (value2.indexOf(char2) > -1)
+        return true;
+    }
+    return false;
+  }, "isSafe");
+  var safePattern = /* @__PURE__ */ __name(function(prefix2) {
+    var prev = result[result.length - 1];
+    var prevText = prefix2 || (prev && typeof prev === "string" ? prev : "");
+    if (prev && !prevText) {
+      throw new TypeError('Must have text between two parameters, missing text after "'.concat(prev.name, '"'));
+    }
+    if (!prevText || isSafe(prevText))
+      return "[^".concat(escapeString(delimiter), "]+?");
+    return "(?:(?!".concat(escapeString(prevText), ")[^").concat(escapeString(delimiter), "])+?");
+  }, "safePattern");
+  while (i < tokens.length) {
+    var char = tryConsume("CHAR");
+    var name = tryConsume("NAME");
+    var pattern = tryConsume("PATTERN");
+    if (name || pattern) {
+      var prefix = char || "";
+      if (prefixes.indexOf(prefix) === -1) {
+        path += prefix;
+        prefix = "";
+      }
+      if (path) {
+        result.push(path);
+        path = "";
+      }
+      result.push({
+        name: name || key++,
+        prefix,
+        suffix: "",
+        pattern: pattern || safePattern(prefix),
+        modifier: tryConsume("MODIFIER") || ""
+      });
+      continue;
+    }
+    var value = char || tryConsume("ESCAPED_CHAR");
+    if (value) {
+      path += value;
+      continue;
+    }
+    if (path) {
+      result.push(path);
+      path = "";
+    }
+    var open = tryConsume("OPEN");
+    if (open) {
+      var prefix = consumeText();
+      var name_1 = tryConsume("NAME") || "";
+      var pattern_1 = tryConsume("PATTERN") || "";
+      var suffix = consumeText();
+      mustConsume("CLOSE");
+      result.push({
+        name: name_1 || (pattern_1 ? key++ : ""),
+        pattern: name_1 && !pattern_1 ? safePattern(prefix) : pattern_1,
+        prefix,
+        suffix,
+        modifier: tryConsume("MODIFIER") || ""
+      });
+      continue;
+    }
+    mustConsume("END");
+  }
+  return result;
+}
+__name(parse, "parse");
+function match(str, options) {
+  var keys = [];
+  var re = pathToRegexp(str, keys, options);
+  return regexpToFunction(re, keys, options);
+}
+__name(match, "match");
+function regexpToFunction(re, keys, options) {
+  if (options === void 0) {
+    options = {};
+  }
+  var _a = options.decode, decode = _a === void 0 ? function(x) {
+    return x;
+  } : _a;
+  return function(pathname) {
+    var m = re.exec(pathname);
+    if (!m)
+      return false;
+    var path = m[0], index = m.index;
+    var params = /* @__PURE__ */ Object.create(null);
+    var _loop_1 = /* @__PURE__ */ __name(function(i2) {
+      if (m[i2] === void 0)
+        return "continue";
+      var key = keys[i2 - 1];
+      if (key.modifier === "*" || key.modifier === "+") {
+        params[key.name] = m[i2].split(key.prefix + key.suffix).map(function(value) {
+          return decode(value, key);
+        });
+      } else {
+        params[key.name] = decode(m[i2], key);
+      }
+    }, "_loop_1");
+    for (var i = 1; i < m.length; i++) {
+      _loop_1(i);
+    }
+    return { path, index, params };
+  };
+}
+__name(regexpToFunction, "regexpToFunction");
+function escapeString(str) {
+  return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
+}
+__name(escapeString, "escapeString");
+function flags(options) {
+  return options && options.sensitive ? "" : "i";
+}
+__name(flags, "flags");
+function regexpToRegexp(path, keys) {
+  if (!keys)
+    return path;
+  var groupsRegex = /\((?:\?<(.*?)>)?(?!\?)/g;
+  var index = 0;
+  var execResult = groupsRegex.exec(path.source);
+  while (execResult) {
+    keys.push({
+      // Use parenthesized substring match if available, index otherwise
+      name: execResult[1] || index++,
+      prefix: "",
+      suffix: "",
+      modifier: "",
+      pattern: ""
+    });
+    execResult = groupsRegex.exec(path.source);
+  }
+  return path;
+}
+__name(regexpToRegexp, "regexpToRegexp");
+function arrayToRegexp(paths, keys, options) {
+  var parts = paths.map(function(path) {
+    return pathToRegexp(path, keys, options).source;
+  });
+  return new RegExp("(?:".concat(parts.join("|"), ")"), flags(options));
+}
+__name(arrayToRegexp, "arrayToRegexp");
+function stringToRegexp(path, keys, options) {
+  return tokensToRegexp(parse(path, options), keys, options);
+}
+__name(stringToRegexp, "stringToRegexp");
+function tokensToRegexp(tokens, keys, options) {
+  if (options === void 0) {
+    options = {};
+  }
+  var _a = options.strict, strict = _a === void 0 ? false : _a, _b = options.start, start = _b === void 0 ? true : _b, _c = options.end, end = _c === void 0 ? true : _c, _d = options.encode, encode = _d === void 0 ? function(x) {
+    return x;
+  } : _d, _e = options.delimiter, delimiter = _e === void 0 ? "/#?" : _e, _f = options.endsWith, endsWith = _f === void 0 ? "" : _f;
+  var endsWithRe = "[".concat(escapeString(endsWith), "]|$");
+  var delimiterRe = "[".concat(escapeString(delimiter), "]");
+  var route = start ? "^" : "";
+  for (var _i = 0, tokens_1 = tokens; _i < tokens_1.length; _i++) {
+    var token = tokens_1[_i];
+    if (typeof token === "string") {
+      route += escapeString(encode(token));
+    } else {
+      var prefix = escapeString(encode(token.prefix));
+      var suffix = escapeString(encode(token.suffix));
+      if (token.pattern) {
+        if (keys)
+          keys.push(token);
+        if (prefix || suffix) {
+          if (token.modifier === "+" || token.modifier === "*") {
+            var mod = token.modifier === "*" ? "?" : "";
+            route += "(?:".concat(prefix, "((?:").concat(token.pattern, ")(?:").concat(suffix).concat(prefix, "(?:").concat(token.pattern, "))*)").concat(suffix, ")").concat(mod);
+          } else {
+            route += "(?:".concat(prefix, "(").concat(token.pattern, ")").concat(suffix, ")").concat(token.modifier);
+          }
+        } else {
+          if (token.modifier === "+" || token.modifier === "*") {
+            throw new TypeError('Can not repeat "'.concat(token.name, '" without a prefix and suffix'));
+          }
+          route += "(".concat(token.pattern, ")").concat(token.modifier);
+        }
+      } else {
+        route += "(?:".concat(prefix).concat(suffix, ")").concat(token.modifier);
+      }
+    }
+  }
+  if (end) {
+    if (!strict)
+      route += "".concat(delimiterRe, "?");
+    route += !options.endsWith ? "$" : "(?=".concat(endsWithRe, ")");
+  } else {
+    var endToken = tokens[tokens.length - 1];
+    var isEndDelimited = typeof endToken === "string" ? delimiterRe.indexOf(endToken[endToken.length - 1]) > -1 : endToken === void 0;
+    if (!strict) {
+      route += "(?:".concat(delimiterRe, "(?=").concat(endsWithRe, "))?");
+    }
+    if (!isEndDelimited) {
+      route += "(?=".concat(delimiterRe, "|").concat(endsWithRe, ")");
+    }
+  }
+  return new RegExp(route, flags(options));
+}
+__name(tokensToRegexp, "tokensToRegexp");
+function pathToRegexp(path, keys, options) {
+  if (path instanceof RegExp)
+    return regexpToRegexp(path, keys);
+  if (Array.isArray(path))
+    return arrayToRegexp(path, keys, options);
+  return stringToRegexp(path, keys, options);
+}
+__name(pathToRegexp, "pathToRegexp");
+
+// C:/Users/JasonPauluo/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/pages-template-worker.ts
+var escapeRegex = /[.+?^${}()|[\]\\]/g;
+function* executeRequest(request) {
+  const requestPath = new URL(request.url).pathname;
+  for (const route of [...routes].reverse()) {
+    if (route.method && route.method !== request.method) {
+      continue;
+    }
+    const routeMatcher = match(route.routePath.replace(escapeRegex, "\\$&"), {
+      end: false
+    });
+    const mountMatcher = match(route.mountPath.replace(escapeRegex, "\\$&"), {
+      end: false
+    });
+    const matchResult = routeMatcher(requestPath);
+    const mountMatchResult = mountMatcher(requestPath);
+    if (matchResult && mountMatchResult) {
+      for (const handler of route.middlewares.flat()) {
+        yield {
+          handler,
+          params: matchResult.params,
+          path: mountMatchResult.path
+        };
+      }
+    }
+  }
+  for (const route of routes) {
+    if (route.method && route.method !== request.method) {
+      continue;
+    }
+    const routeMatcher = match(route.routePath.replace(escapeRegex, "\\$&"), {
+      end: true
+    });
+    const mountMatcher = match(route.mountPath.replace(escapeRegex, "\\$&"), {
+      end: false
+    });
+    const matchResult = routeMatcher(requestPath);
+    const mountMatchResult = mountMatcher(requestPath);
+    if (matchResult && mountMatchResult && route.modules.length) {
+      for (const handler of route.modules.flat()) {
+        yield {
+          handler,
+          params: matchResult.params,
+          path: matchResult.path
+        };
+      }
+      break;
+    }
+  }
+}
+__name(executeRequest, "executeRequest");
+var pages_template_worker_default = {
+  async fetch(originalRequest, env, workerContext) {
+    let request = originalRequest;
+    const handlerIterator = executeRequest(request);
+    let data = {};
+    let isFailOpen = false;
+    const next = /* @__PURE__ */ __name(async (input, init) => {
+      if (input !== void 0) {
+        let url = input;
+        if (typeof input === "string") {
+          url = new URL(input, request.url).toString();
+        }
+        request = new Request(url, init);
+      }
+      const result = handlerIterator.next();
+      if (result.done === false) {
+        const { handler, params, path } = result.value;
+        const context = {
+          request: new Request(request.clone()),
+          functionPath: path,
+          next,
+          params,
+          get data() {
+            return data;
+          },
+          set data(value) {
+            if (typeof value !== "object" || value === null) {
+              throw new Error("context.data must be an object");
+            }
+            data = value;
+          },
+          env,
+          waitUntil: workerContext.waitUntil.bind(workerContext),
+          passThroughOnException: /* @__PURE__ */ __name(() => {
+            isFailOpen = true;
+          }, "passThroughOnException")
+        };
+        const response = await handler(context);
+        if (!(response instanceof Response)) {
+          throw new Error("Your Pages function should return a Response");
+        }
+        return cloneResponse(response);
+      } else if ("ASSETS") {
+        const response = await env["ASSETS"].fetch(request);
+        return cloneResponse(response);
+      } else {
+        const response = await fetch(request);
+        return cloneResponse(response);
+      }
+    }, "next");
+    try {
+      return await next();
+    } catch (error) {
+      if (isFailOpen) {
+        const response = await env["ASSETS"].fetch(request);
+        return cloneResponse(response);
+      }
+      throw error;
+    }
+  }
+};
+var cloneResponse = /* @__PURE__ */ __name((response) => (
+  // https://fetch.spec.whatwg.org/#null-body-status
+  new Response(
+    [101, 204, 205, 304].includes(response.status) ? null : response.body,
+    response
+  )
+), "cloneResponse");
+export {
+  pages_template_worker_default as default
+};
+
+------formdata-undici-016274329175--

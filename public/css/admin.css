@@ -901,6 +901,7 @@ tr:nth-child(even) {
 :root {
   --card-padding: 1.25rem;
   --card-radius: 1rem;
+  --card-scale: 1;
   --frosted-glass-blur: 15px;
 }
 
@@ -908,6 +909,7 @@ tr:nth-child(even) {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, box-shadow;
   border-radius: var(--card-radius);
+  min-height: calc(84px * var(--card-scale));
   width: 100%;
   background: white;
   border: 1px solid #f3f4f6; /* Subtle border */
@@ -916,7 +918,7 @@ tr:nth-child(even) {
 }
 
 .site-card-content {
-  padding: var(--card-padding);
+  padding: calc(var(--card-padding) * var(--card-scale));
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -942,10 +944,15 @@ tr:nth-child(even) {
 
 /* 图标消失动画 - Removed strict hover effects for cleaner look, or keep subtle */
 .site-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  margin-right: 1rem;
+  width: calc(2.5rem * var(--card-scale));
+  height: calc(2.5rem * var(--card-scale));
+  margin-right: calc(1rem * var(--card-scale));
   transition: all 0.3s ease;
+}
+.site-icon img,
+.site-icon div {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .site-card:hover .site-icon {
@@ -1120,9 +1127,9 @@ input[list]:hover::-webkit-calendar-picker-indicator {
 
 .site-card.style-2 .site-icon {
     margin-right: 0;
-    margin-bottom: 0.5rem;
-    width: 3rem; 
-    height: 3rem;
+    margin-bottom: calc(0.5rem * var(--card-scale));
+    width: calc(3rem * var(--card-scale));
+    height: calc(3rem * var(--card-scale));
     transition: transform 0.3s ease;
 }
 
