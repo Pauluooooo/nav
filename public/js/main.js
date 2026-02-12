@@ -112,17 +112,22 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // ========== 返回顶部 ==========
   const backToTop = document.getElementById('backToTop');
-  
+
   const toggleBackToTop = () => {
-    if (getCurrentScrollTop() > 0) {
+    const scrollTop = getCurrentScrollTop();
+    // 只要滚动位置大于0，就立即显示按钮
+    if (scrollTop > 0) {
       backToTop?.classList.remove('opacity-0', 'invisible');
+      backToTop?.classList.add('opacity-100', 'visible');
     } else {
+      backToTop?.classList.remove('opacity-100', 'visible');
       backToTop?.classList.add('opacity-0', 'invisible');
     }
   };
   scrollContainer.addEventListener('scroll', toggleBackToTop, { passive: true });
+  // 初始化时检查一次
   toggleBackToTop();
-  
+
   backToTop?.addEventListener('click', function() {
     smoothScrollTo(0);
   });
@@ -1174,9 +1179,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Auto-restore Last Category (disabled — always show all on refresh)
   (function() {
+      // 清除 URL 中的 catalog 参数，确保每次刷新都显示全部分类
       const urlParams = new URLSearchParams(window.location.search);
       const hasCatalogParam = urlParams.has('catalog');
-      if (hasCatalogParam) return;
+
+      // 如果 URL 中有 catalog 参数，清除它
+      if (hasCatalogParam) {
+          // 使用 replaceState 清除 URL 参数，不触发页面刷新
+          const newUrl = window.location.pathname;
+          history.replaceState(null, '', newUrl);
+      }
 
       const visibleCount = ensureAllSitesRenderedForGroupedView();
       updateHeading(currentSearchKeyword, null, visibleCount);
@@ -1280,23 +1292,18 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ========== Mobile Keyboard Background Stability ==========
+  // 禁用背景移动功能，保持壁纸固定
   (function() {
       const bgContainer = document.getElementById('fixed-background');
-      if (!bgContainer || !window.visualViewport) return;
+      if (!bgContainer) return;
 
-      const syncBackgroundOffset = () => {
-          const offsetTop = Math.max(window.visualViewport.offsetTop || 0, 0);
-          if (offsetTop > 0) {
-              bgContainer.style.transform = `translate3d(0, ${offsetTop}px, 0)`;
-          } else {
-              bgContainer.style.removeProperty('transform');
-          }
-      };
-
-      window.visualViewport.addEventListener('resize', syncBackgroundOffset);
-      window.visualViewport.addEventListener('scroll', syncBackgroundOffset);
-      window.addEventListener('orientationchange', () => setTimeout(syncBackgroundOffset, 120));
-      syncBackgroundOffset();
+      // 确保背景容器始终固定，不随键盘移动
+      bgContainer.style.position = 'fixed';
+      bgContainer.style.top = '0';
+      bgContainer.style.left = '0';
+      bgContainer.style.width = '100%';
+      bgContainer.style.height = '100%';
+      bgContainer.style.transform = 'none';
   })();
 
   // ========== Random Wallpaper Logic (Client-side) ==========
