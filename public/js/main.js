@@ -359,7 +359,27 @@ document.addEventListener('DOMContentLoaded', function() {
   // 初次加载时根据屏幕宽度修正标题显示
   updateHeading();
   groupRenderedCards();
-  
+
+  // 初次加载时，如果 URL 带有 ?catalog= 参数，滚动定位到对应分组
+  (function initialCatalogScroll() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const catalogParam = (urlParams.get('catalog') || '').trim();
+      if (!catalogParam || catalogParam.toLowerCase() === 'all') return;
+
+      // 通过导航链接查找对应的 data-id
+      const link = document.querySelector(`a[href="?catalog=${encodeURIComponent(catalogParam)}"][data-id]`);
+      if (!link) return;
+      const catalogId = link.getAttribute('data-id');
+      if (!catalogId) return;
+
+      updateNavigationState(catalogId);
+      const targetSection = locateCategoryGroup(catalogId, catalogParam);
+      const visibleCount = targetSection
+          ? targetSection.querySelectorAll('.site-card:not(.hidden)').length
+          : (sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0);
+      updateHeading(currentSearchKeyword, catalogParam, visibleCount);
+  })();
+
   // ========== 一言 API ==========
   const hitokotoContainer = document.querySelector('#hitokoto').parentElement;
   // 检查容器是否被隐藏，如果隐藏则不发起请求
