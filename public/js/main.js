@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', function() {
+  // 禁用浏览器自动滚动恢复，确保刷新后始终从顶部开始
+  if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+  }
+
   // ========== 侧边栏控制 ==========
   const sidebar = document.getElementById('sidebar');
   const mobileOverlay = document.getElementById('mobileOverlay');
@@ -1205,7 +1210,19 @@ document.addEventListener('DOMContentLoaded', function() {
       const visibleCount = ensureAllSitesRenderedForGroupedView();
       updateHeading(currentSearchKeyword, null, visibleCount);
       updateNavigationState(null);
+      // 强制滚动到顶部，覆盖浏览器的滚动位置恢复
+      if (appScroll) appScroll.scrollTop = 0;
   })();
+
+  // 处理 bfcache（前进后退缓存）恢复时重置分类状态
+  window.addEventListener('pageshow', function(event) {
+      if (event.persisted) {
+          ensureAllSitesRenderedForGroupedView();
+          updateNavigationState(null);
+          updateHeading(currentSearchKeyword, null);
+          if (appScroll) appScroll.scrollTop = 0;
+      }
+  });
 
   // Theme Toggle + Time Auto Mode
   const themeToggleBtn = document.getElementById('themeToggleBtn');

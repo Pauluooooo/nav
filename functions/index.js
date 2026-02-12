@@ -1311,8 +1311,8 @@ export async function onRequest(context) {
   // 替换 body 标签结构，增加 #app-scroll 滚动容器
   html = html.replace('<body class="bg-secondary-50 font-sans text-gray-800">', `<body class="bg-secondary-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-100 relative ${isCustomWallpaper ? 'custom-wallpaper' : ''}">${bgLayerHtml}<div id="app-scroll">`);
   
-  // 闭合滚动容器
-  html = html.replace('</body>', '</div></body>');
+  // 闭合滚动容器（在 </main> 后关闭，使 #backToTop 和模态框脱离 #app-scroll 的层叠上下文）
+  html = html.replace('</main>', '</main></div>');
   
   // Inject Card CSS Variables
   const cardRadius = parseInt(layoutCardBorderRadius) || 12;

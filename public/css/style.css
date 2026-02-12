@@ -1280,7 +1280,7 @@ body.drag-sorting .site-card:hover {
   right: 0;
   bottom: 0;
   width: 100vw;
-  height: 100dvh;
+  height: 100vh;
   will-change: transform;
   pointer-events: none;
 }
@@ -1293,7 +1293,7 @@ body.drag-sorting .site-card:hover {
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    height: 100dvh !important; /* 动态视口高度，考虑移动端地址栏 */
+    height: 100vh !important; /* 使用静态视口高度，避免键盘弹出时壁纸移动 */
     transform: none !important;
   }
 
