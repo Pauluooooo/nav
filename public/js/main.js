@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const backToTop = document.getElementById('backToTop');
   
   const toggleBackToTop = () => {
-    if (getCurrentScrollTop() > 300) {
+    if (getCurrentScrollTop() > 100) {
       backToTop?.classList.remove('opacity-0', 'invisible');
     } else {
       backToTop?.classList.add('opacity-0', 'invisible');

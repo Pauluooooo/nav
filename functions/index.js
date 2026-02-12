@@ -1367,7 +1367,7 @@ export async function onRequest(context) {
       if (s) customCardCss += `.site-card p { ${s} }`;
   }
   if (cardWidth && cardWidth !== '100%') {
-      customCardCss += `.site-card { width: ${cardWidth}; }`;
+      customCardCss += `@media (min-width: 768px) { .site-card { width: ${cardWidth}; } }`;
   }
   customCardCss += '</style>';
   
