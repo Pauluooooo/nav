@@ -361,7 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
   groupRenderedCards();
 
   // ========== 一言 API ==========
-  const hitokotoContainer = document.querySelector('#hitokoto').parentElement;
+  const hitokotoContainer = document.querySelector('#hitokoto')?.parentElement;
   // 检查容器是否被隐藏，如果隐藏则不发起请求
   if (hitokotoContainer && !hitokotoContainer.classList.contains('hidden')) {
     console.log('[Debug] Fetching hitokoto...');
