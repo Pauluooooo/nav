@@ -1274,6 +1274,15 @@ body.drag-sorting .site-card:hover {
   object-fit: cover;
   object-position: center center;
   display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100dvh;
+  will-change: transform;
+  pointer-events: none;
 }
 
 /* 移动端优化：确保壁纸完全覆盖屏幕 */

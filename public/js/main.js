@@ -111,26 +111,53 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // ========== 返回顶部 ==========
-  const backToTop = document.getElementById('backToTop');
+    const backToTop = document.getElementById('backToTop');
 
-  const toggleBackToTop = () => {
-    const scrollTop = getCurrentScrollTop();
-    // 只要滚动位置大于0，就立即显示按钮
-    if (scrollTop > 0) {
-      backToTop?.classList.remove('opacity-0', 'invisible');
-      backToTop?.classList.add('opacity-100', 'visible');
-    } else {
-      backToTop?.classList.remove('opacity-100', 'visible');
-      backToTop?.classList.add('opacity-0', 'invisible');
+    function showBackToTop() {
+        if (!backToTop) return;
+        backToTop.classList.remove('opacity-0', 'invisible');
+        backToTop.classList.add('opacity-100', 'visible');
     }
-  };
-  scrollContainer.addEventListener('scroll', toggleBackToTop, { passive: true });
-  // 初始化时检查一次
-  toggleBackToTop();
 
-  backToTop?.addEventListener('click', function() {
-    smoothScrollTo(0);
-  });
+    function hideBackToTop() {
+        if (!backToTop) return;
+        backToTop.classList.remove('opacity-100', 'visible');
+        backToTop.classList.add('opacity-0', 'invisible');
+    }
+
+    const toggleBackToTop = () => {
+        const scrollTop = getCurrentScrollTop();
+        if (scrollTop > 0) showBackToTop();
+        else hideBackToTop();
+    };
+
+    // Show immediately on various user interactions that indicate downward intent
+    function handleWheel(e) {
+        if (e.deltaY > 0) showBackToTop();
+    }
+
+    function handleTouchStart(e) {
+        // If touch starts and page is not at top, show immediately
+        const t = e.touches && e.touches[0];
+        if (t && getCurrentScrollTop() > 0) showBackToTop();
+    }
+
+    function handleKeyDown(e) {
+        // PageDown, ArrowDown, Space indicate downward movement
+        if (['PageDown', 'ArrowDown', ' '].includes(e.key)) showBackToTop();
+    }
+
+    scrollContainer.addEventListener('scroll', toggleBackToTop, { passive: true });
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('keydown', handleKeyDown, { passive: true });
+
+    // 初始化时检查一次
+    toggleBackToTop();
+
+    backToTop?.addEventListener('click', function() {
+        smoothScrollTo(0);
+    });
   
   // ========== 模态框控制 ==========
   const addSiteModal = document.getElementById('addSiteModal');
@@ -523,24 +550,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // 初次加载时，如果 URL 带有 ?catalog= 参数，滚动定位到对应分组
+  // 已禁用页面初次根据 URL 定位分类的自动跳转，以确保每次刷新都显示全部分类
   (function initialCatalogScroll() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const catalogParam = (urlParams.get('catalog') || '').trim();
-      if (!catalogParam || catalogParam.toLowerCase() === 'all') return;
-
-      // 通过导航链接查找对应的 data-id
-      const link = document.querySelector(`a[href="?catalog=${encodeURIComponent(catalogParam)}"][data-id]`);
-      if (!link) return;
-      const catalogId = link.getAttribute('data-id');
-      if (!catalogId) return;
-
-      updateNavigationState(catalogId);
-      const targetSection = locateCategoryGroup(catalogId, catalogParam);
-      const visibleCount = targetSection
-          ? targetSection.querySelectorAll('.site-card:not(.hidden)').length
-          : (sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0);
-      updateHeading(currentSearchKeyword, catalogParam, visibleCount);
+      // Intentionally left blank.
   })();
 
   function findCategoryGroupSection(catalogId, catalogName = '') {
