@@ -4,6 +4,32 @@ document.addEventListener('DOMContentLoaded', function() {
   const mobileOverlay = document.getElementById('mobileOverlay');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const closeSidebar = document.getElementById('closeSidebar');
+  const appScroll = document.getElementById('app-scroll');
+  const scrollContainer = appScroll || window;
+
+  function getCurrentScrollTop() {
+    if (appScroll) return appScroll.scrollTop || 0;
+    return window.pageYOffset || document.documentElement.scrollTop || 0;
+  }
+
+  function smoothScrollTo(top) {
+    const targetTop = Math.max(0, Number(top) || 0);
+    if (appScroll) {
+      appScroll.scrollTo({ top: targetTop, behavior: 'smooth' });
+      return;
+    }
+    window.scrollTo({ top: targetTop, behavior: 'smooth' });
+  }
+
+  function getElementScrollTop(element) {
+    if (!element) return 0;
+    const rect = element.getBoundingClientRect();
+    if (appScroll) {
+      const containerRect = appScroll.getBoundingClientRect();
+      return rect.top - containerRect.top + appScroll.scrollTop;
+    }
+    return rect.top + window.scrollY;
+  }
   
   function openSidebar() {
     sidebar?.classList.add('open');
@@ -74,16 +100,18 @@ document.addEventListener('DOMContentLoaded', function() {
   // ========== 返回顶部 ==========
   const backToTop = document.getElementById('backToTop');
   
-  window.addEventListener('scroll', function() {
-    if (window.pageYOffset > 300) {
+  const toggleBackToTop = () => {
+    if (getCurrentScrollTop() > 300) {
       backToTop?.classList.remove('opacity-0', 'invisible');
     } else {
       backToTop?.classList.add('opacity-0', 'invisible');
     }
-  });
+  };
+  scrollContainer.addEventListener('scroll', toggleBackToTop, { passive: true });
+  toggleBackToTop();
   
   backToTop?.addEventListener('click', function() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    smoothScrollTo(0);
   });
   
   // ========== 模态框控制 ==========
@@ -505,8 +533,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
       const header = document.querySelector('header');
       const offset = (header ? header.getBoundingClientRect().height : 80) + 16;
-      const targetTop = targetSection.getBoundingClientRect().top + window.scrollY - offset;
-      window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      const targetTop = getElementScrollTop(targetSection) - offset;
+      smoothScrollTo(targetTop);
 
       document.querySelectorAll('.bookmark-group.group-locate-active').forEach(group => {
           group.classList.remove('group-locate-active');
@@ -535,16 +563,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ========== AJAX Navigation ==========
   document.addEventListener('click', (e) => {
-    const link = e.target.closest('a[href^="?catalog="]');
+    const link = e.target.closest('a[href]');
     if (!link) return;
+    let parsedHref;
+    try {
+        parsedHref = new URL(link.getAttribute('href'), window.location.href);
+    } catch (_error) {
+        return;
+    }
+    if (parsedHref.origin !== window.location.origin || parsedHref.pathname !== window.location.pathname) {
+        return;
+    }
+    const catalogParam = parsedHref.searchParams.get('catalog');
+    if (catalogParam === null) return;
     
     // Allow new tab clicks
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
     e.preventDefault();
-    const href = link.getAttribute('href');
+    const href = parsedHref.pathname + parsedHref.search + parsedHref.hash;
     const catalogId = String(link.getAttribute('data-id') || '').trim();
-    const catalogName = link.textContent.trim();
+    const catalogName = String(catalogParam || '').trim() || link.textContent.trim();
     
     if (typeof closeSidebarMenu === 'function') {
         closeSidebarMenu();
@@ -561,7 +600,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!catalogId) {
         updateNavigationState(null);
         updateHeading(currentSearchKeyword, null, visibleCount);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        smoothScrollTo(0);
     } else {
         updateNavigationState(catalogId);
         const targetSection = locateCategoryGroup(catalogId, catalogName);
@@ -909,12 +948,8 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // 使用全局配置获取布局设置，避免依赖 DOM 推断
       const config = window.IORI_LAYOUT_CONFIG || {};
-      const isFiveCols = config.gridCols === '5';
-      const isSixCols = config.gridCols === '6';
-      const hideDesc = config.hideDesc === true;
-      const hideLinks = config.hideLinks === true;
-      const hideCategory = config.hideCategory === true;
       const cardStyle = config.cardStyle || 'style1';
+      const useCompactCard = true;
       
       // 优先从配置获取毛玻璃开关状态，CSS 变量作为回退
       const computedStyle = getComputedStyle(document.documentElement);
@@ -943,22 +978,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="hidden w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`
              : `<div class="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-semibold text-lg shadow-inner">${cardInitial}</div>`;
         
-        const descHtml = hideDesc ? '' : `<p class="mt-2 text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2" title="${safeDesc}">${safeDesc}</p>`;
-        
         const hasValidUrl = !!safeUrl;
-        const linksHtml = hideLinks ? '' : `
-          <div class="mt-3 flex items-center justify-between">
-            <span class="text-xs text-primary-600 dark:text-primary-400 truncate flex-1 min-w-0 mr-2" title="${safeUrl}">${safeUrl || '未提供链接'}</span>
-            <button class="copy-btn relative flex items-center px-2 py-1 ${hasValidUrl ? 'bg-accent-100 text-accent-700 hover:bg-accent-200 dark:bg-accent-900/30 dark:text-accent-300 dark:hover:bg-accent-900/50' : 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'} rounded-full text-xs font-medium transition-colors" data-url="${safeUrl}" ${hasValidUrl ? '' : 'disabled'}>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ${isFiveCols || isSixCols ? '' : 'mr-1'}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-              </svg>
-              ${isFiveCols || isSixCols ? '' : '<span class="copy-text">复制</span>'}
-              <span class="copy-success hidden absolute -top-8 right-0 bg-accent-500 text-white text-xs px-2 py-1 rounded shadow-md">已复制!</span>
-            </button>
-          </div>`;
-          
-        const categoryHtml = hideCategory ? '' : `
+        const safeHref = hasValidUrl ? safeUrl : '#';
+        const categoryHtml = useCompactCard ? '' : `
                 <span class="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-secondary-100 text-primary-700 dark:bg-secondary-800 dark:text-primary-300">
                   ${safeCatalog}
                 </span>`;
@@ -997,8 +1019,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         card.innerHTML = `
         <div class="site-card-content">
-          <a href="${safeUrl}" ${hasValidUrl ? 'target="_blank" rel="noopener noreferrer"' : ''} class="block">
-            <div class="flex items-start">
+          <a href="${safeHref}" ${hasValidUrl ? 'target="_blank" rel="noopener noreferrer"' : ''} class="block">
+            <div class="flex items-center">
               <div class="site-icon flex-shrink-0 mr-4 transition-all duration-300">
                 ${logoHtml}
               </div>
@@ -1007,35 +1029,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${categoryHtml}
               </div>
             </div>
-            ${descHtml}
           </a>
-          ${linksHtml}
         </div>
         `;
         
         sitesGrid.appendChild(card);
-        
-        const copyBtn = card.querySelector('.copy-btn');
-        if (copyBtn) {
-            copyBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                const url = this.getAttribute('data-url');
-                if (!url) return;
-                
-                navigator.clipboard.writeText(url).then(() => {
-                    showCopySuccess(this);
-                }).catch(() => {
-                    const textarea = document.createElement('textarea');
-                    textarea.value = url;
-                    textarea.style.position = 'fixed';
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    try { document.execCommand('copy'); showCopySuccess(this); } catch (e) {}
-                    document.body.removeChild(textarea);
-                });
-            });
-        }
       });
       groupRenderedCards();
       filterVisibleCards(currentSearchKeyword);
@@ -1342,6 +1340,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   newImg.src = newUrl;
                   newImg.onload = () => {
                       if (img) {
+                          img.classList.add('wallpaper-image');
                           img.style.transition = 'opacity 0.5s ease-in-out';
                           img.style.opacity = '0';
                           setTimeout(() => {
@@ -1350,7 +1349,9 @@ document.addEventListener('DOMContentLoaded', function() {
                           }, 500);
                       } else {
                           // If no img tag exists (e.g. initial solid color), create one
-                          bgContainer.innerHTML = `<img src="${newUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; filter: blur(${config.enableBgBlur ? config.bgBlurIntensity : 0}px); transform: scale(1.02); opacity: 0; transition: opacity 0.5s ease-in-out;" />`;
+                          const blurValue = config.enableBgBlur ? Number(config.bgBlurIntensity) || 0 : 0;
+                          const blurStyle = blurValue > 0 ? `filter: blur(${blurValue}px); transform: scale(1.02);` : 'transform: scale(1);';
+                          bgContainer.innerHTML = `<img class="wallpaper-image" src="${newUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; object-position: center center; ${blurStyle} opacity: 0; transition: opacity 0.5s ease-in-out;" />`;
                           setTimeout(() => {
                               bgContainer.querySelector('img').style.opacity = '1';
                           }, 50);
