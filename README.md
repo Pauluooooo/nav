@@ -1,7 +1,5 @@
-# 灰色轨迹 - 精品网址导航站
-
 <p align="center">
-  一个优雅、快速、易于部署的书签（网址）收藏与分享平台，完全基于 Cloudflare 全家桶构建。
+  Vibe Coding 请勿使用
 </p>
 
 <p align="center">
