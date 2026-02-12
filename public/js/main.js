@@ -614,6 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateNavigationState(null);
         updateHeading(currentSearchKeyword, null, visibleCount);
         smoothScrollTo(0);
+        history.pushState(null, '', href);
     } else {
         updateNavigationState(catalogId);
         const targetSection = locateCategoryGroup(catalogId, catalogName);
@@ -621,6 +622,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ? targetSection.querySelectorAll('.site-card:not(.hidden)').length
             : visibleCount;
         updateHeading(currentSearchKeyword, catalogName || null, groupVisibleCount);
+        history.pushState(null, '', href);
     }
 
     // In grouped-home mode, remember the last located group id.

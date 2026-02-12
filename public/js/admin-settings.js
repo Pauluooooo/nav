@@ -754,109 +754,106 @@ const initSettings = () => {
   }
 
   saveBtn.addEventListener('click', () => {
-    // Update state from inputs
-    const newApiKey = apiKeyInput.value.trim();
-    if (newApiKey) {
-        currentSettings.apiKey = newApiKey;
-    } else if (currentSettings.has_api_key) {
-        // User didn't type anything but we have a key, so don't send anything (undefined)
-        // allowing backend to keep existing value if we filter it, 
-        // OR we just don't update the property in currentSettings if it was undefined.
-        // But loadSettings sets currentSettings.apiKey = undefined.
-        // So just delete it to be safe, ensuring it's not sent as ""
-        delete currentSettings.apiKey;
-    } else {
-        // No key previously, and input is empty -> clear it
-        currentSettings.apiKey = '';
+    try {
+      // Update state from inputs
+      const newApiKey = apiKeyInput.value.trim();
+      if (newApiKey) {
+          currentSettings.apiKey = newApiKey;
+      } else if (currentSettings.has_api_key) {
+          delete currentSettings.apiKey;
+      } else {
+          currentSettings.apiKey = '';
+      }
+
+      currentSettings.baseUrl = baseUrlInput.value.trim();
+      currentSettings.model = modelNameInput.value.trim();
+      currentSettings.layout_hide_desc = hideDescSwitch?.checked ?? currentSettings.layout_hide_desc;
+      currentSettings.layout_hide_links = hideLinksSwitch?.checked ?? currentSettings.layout_hide_links;
+      currentSettings.layout_hide_category = hideCategorySwitch?.checked ?? currentSettings.layout_hide_category;
+      currentSettings.home_hide_github = hideGithubSwitch?.checked ?? currentSettings.home_hide_github;
+      currentSettings.home_hide_admin = hideAdminSwitch?.checked ?? currentSettings.home_hide_admin;
+
+      currentSettings.layout_hide_title = hideTitleSwitch?.checked ?? currentSettings.layout_hide_title;
+      currentSettings.home_title_size = homeTitleSizeInput?.value?.trim() ?? currentSettings.home_title_size;
+      currentSettings.home_title_color = homeTitleColorInput?.value?.trim() ?? currentSettings.home_title_color;
+
+      currentSettings.layout_hide_subtitle = hideSubtitleSwitch?.checked ?? currentSettings.layout_hide_subtitle;
+      currentSettings.home_subtitle_size = homeSubtitleSizeInput?.value?.trim() ?? currentSettings.home_subtitle_size;
+      currentSettings.home_subtitle_color = homeSubtitleColorInput?.value?.trim() ?? currentSettings.home_subtitle_color;
+
+      currentSettings.home_hide_stats = hideStatsSwitch?.checked ?? currentSettings.home_hide_stats;
+      currentSettings.home_stats_size = homeStatsSizeInput?.value?.trim() ?? currentSettings.home_stats_size;
+      currentSettings.home_stats_color = homeStatsColorInput?.value?.trim() ?? currentSettings.home_stats_color;
+
+      currentSettings.home_title_font = homeTitleFontInput?.value?.trim() ?? currentSettings.home_title_font;
+      currentSettings.home_subtitle_font = homeSubtitleFontInput?.value?.trim() ?? currentSettings.home_subtitle_font;
+      currentSettings.home_stats_font = homeStatsFontInput?.value?.trim() ?? currentSettings.home_stats_font;
+
+      currentSettings.home_site_name = homeSiteNameInput?.value?.trim() ?? currentSettings.home_site_name;
+      currentSettings.home_site_description = homeSiteDescriptionInput?.value?.trim() ?? currentSettings.home_site_description;
+
+      if (homeDefaultCategorySelect) {
+          currentSettings.home_default_category = homeDefaultCategorySelect.value;
+      }
+
+      if (homeRememberLastCategorySwitch) {
+          currentSettings.home_remember_last_category = homeRememberLastCategorySwitch.checked;
+      }
+
+      const rawSearchProvider = (searchEngineProviderSelect?.value || 'local').toLowerCase();
+      const normalizedSearchProvider = ['local', 'google', 'baidu', 'bing'].includes(rawSearchProvider)
+        ? rawSearchProvider
+        : 'local';
+      currentSettings.home_search_engine_provider = normalizedSearchProvider;
+      currentSettings.home_search_engine_enabled = normalizedSearchProvider !== 'local';
+      currentSettings.home_theme_mode = normalizeThemeMode(homeThemeModeSelect?.value || currentSettings.home_theme_mode);
+      currentSettings.home_theme_auto_dark_start = normalizeThemeHour(homeThemeDarkStartHourInput?.value, 19);
+      currentSettings.home_theme_auto_dark_end = normalizeThemeHour(homeThemeDarkEndHourInput?.value, 7);
+      if (homeThemeDarkStartHourInput) homeThemeDarkStartHourInput.value = currentSettings.home_theme_auto_dark_start;
+      if (homeThemeDarkEndHourInput) homeThemeDarkEndHourInput.value = currentSettings.home_theme_auto_dark_end;
+
+      currentSettings.layout_custom_wallpaper = customWallpaperInput?.value?.trim() ?? currentSettings.layout_custom_wallpaper;
+      currentSettings.layout_random_wallpaper = randomWallpaperSwitch?.checked ?? currentSettings.layout_random_wallpaper;
+      currentSettings.layout_enable_bg_blur = bgBlurSwitch?.checked ?? currentSettings.layout_enable_bg_blur;
+      currentSettings.layout_bg_blur_intensity = bgBlurIntensityRange?.value ?? currentSettings.layout_bg_blur_intensity;
+      currentSettings.bing_country = bingCountrySelect?.value ?? currentSettings.bing_country;
+      currentSettings.wallpaper_cid_360 = category360Select?.value ?? currentSettings.wallpaper_cid_360;
+
+      // Get Grid Cols
+      for (const radio of gridColsRadios) {
+          if (radio.checked) {
+              currentSettings.layout_grid_cols = radio.value;
+              break;
+          }
+      }
+
+      // Menu Layout
+      for (const radio of menuLayoutRadios) {
+          if (radio.checked) {
+              currentSettings.layout_menu_layout = radio.value;
+              break;
+          }
+      }
+
+      currentSettings.layout_enable_frosted_glass = frostedGlassSwitch?.checked ?? currentSettings.layout_enable_frosted_glass;
+      currentSettings.layout_frosted_glass_intensity = frostedGlassIntensityRange?.value ?? currentSettings.layout_frosted_glass_intensity;
+
+      currentSettings.layout_card_border_radius = cardRadiusInput?.value ?? currentSettings.layout_card_border_radius;
+      currentSettings.layout_card_scale = cardScaleInput ? cardScaleInput.value : (currentSettings.layout_card_scale || '100');
+      currentSettings.card_width = cardWidthSelect ? cardWidthSelect.value : (currentSettings.card_width || '100%');
+
+      currentSettings.card_title_font = cardTitleFontInput?.value?.trim() ?? currentSettings.card_title_font;
+      currentSettings.card_title_size = cardTitleSizeInput?.value?.trim() ?? currentSettings.card_title_size;
+      currentSettings.card_title_color = cardTitleColorInput?.value?.trim() ?? currentSettings.card_title_color;
+      currentSettings.card_desc_font = cardDescFontInput?.value?.trim() ?? currentSettings.card_desc_font;
+      currentSettings.card_desc_size = cardDescSizeInput?.value?.trim() ?? currentSettings.card_desc_size;
+      currentSettings.card_desc_color = cardDescColorInput?.value?.trim() ?? currentSettings.card_desc_color;
+
+      saveSettings();
+    } catch (e) {
+      console.error('Save handler error:', e);
+      showMessage('保存失败: ' + e.message, 'error');
     }
-
-    currentSettings.baseUrl = baseUrlInput.value.trim();
-    currentSettings.model = modelNameInput.value.trim();
-    currentSettings.layout_hide_desc = hideDescSwitch.checked;
-    currentSettings.layout_hide_links = hideLinksSwitch.checked;
-    currentSettings.layout_hide_category = hideCategorySwitch.checked;
-    currentSettings.home_hide_github = hideGithubSwitch.checked;
-    currentSettings.home_hide_admin = hideAdminSwitch.checked;
-    
-    currentSettings.layout_hide_title = hideTitleSwitch.checked;
-    currentSettings.home_title_size = homeTitleSizeInput.value.trim();
-    currentSettings.home_title_color = homeTitleColorInput.value.trim();
-
-    currentSettings.layout_hide_subtitle = hideSubtitleSwitch.checked;
-    currentSettings.home_subtitle_size = homeSubtitleSizeInput.value.trim();
-    currentSettings.home_subtitle_color = homeSubtitleColorInput.value.trim();
-
-    currentSettings.home_hide_stats = hideStatsSwitch.checked;
-    currentSettings.home_stats_size = homeStatsSizeInput.value.trim();
-    currentSettings.home_stats_color = homeStatsColorInput.value.trim();
-
-    currentSettings.home_title_font = homeTitleFontInput.value.trim();
-    currentSettings.home_subtitle_font = homeSubtitleFontInput.value.trim();
-    currentSettings.home_stats_font = homeStatsFontInput.value.trim();
-
-    currentSettings.home_site_name = homeSiteNameInput.value.trim();
-    currentSettings.home_site_description = homeSiteDescriptionInput.value.trim();
-    
-    if (homeDefaultCategorySelect) {
-        currentSettings.home_default_category = homeDefaultCategorySelect.value;
-    }
-    
-    if (homeRememberLastCategorySwitch) {
-        currentSettings.home_remember_last_category = homeRememberLastCategorySwitch.checked;
-    }
-
-    const rawSearchProvider = (searchEngineProviderSelect?.value || 'local').toLowerCase();
-    const normalizedSearchProvider = ['local', 'google', 'baidu', 'bing'].includes(rawSearchProvider)
-      ? rawSearchProvider
-      : 'local';
-    currentSettings.home_search_engine_provider = normalizedSearchProvider;
-    currentSettings.home_search_engine_enabled = normalizedSearchProvider !== 'local';
-    currentSettings.home_theme_mode = normalizeThemeMode(homeThemeModeSelect?.value || currentSettings.home_theme_mode);
-    currentSettings.home_theme_auto_dark_start = normalizeThemeHour(homeThemeDarkStartHourInput?.value, 19);
-    currentSettings.home_theme_auto_dark_end = normalizeThemeHour(homeThemeDarkEndHourInput?.value, 7);
-    if (homeThemeDarkStartHourInput) homeThemeDarkStartHourInput.value = currentSettings.home_theme_auto_dark_start;
-    if (homeThemeDarkEndHourInput) homeThemeDarkEndHourInput.value = currentSettings.home_theme_auto_dark_end;
-
-    currentSettings.layout_custom_wallpaper = customWallpaperInput.value.trim();
-    currentSettings.layout_random_wallpaper = randomWallpaperSwitch.checked;
-    currentSettings.layout_enable_bg_blur = bgBlurSwitch.checked;
-    currentSettings.layout_bg_blur_intensity = bgBlurIntensityRange.value;
-    currentSettings.bing_country = bingCountrySelect.value;
-    currentSettings.wallpaper_cid_360 = category360Select.value;
-    
-    // Get Grid Cols
-    for (const radio of gridColsRadios) {
-        if (radio.checked) {
-            currentSettings.layout_grid_cols = radio.value;
-            break;
-        }
-    }
-    
-    // Menu Layout
-    for (const radio of menuLayoutRadios) {
-        if (radio.checked) {
-            currentSettings.layout_menu_layout = radio.value;
-            break;
-        }
-    }
-    
-    currentSettings.layout_enable_frosted_glass = frostedGlassSwitch.checked;
-    currentSettings.layout_frosted_glass_intensity = frostedGlassIntensityRange.value;
-    
-    currentSettings.layout_card_border_radius = cardRadiusInput.value;
-    currentSettings.layout_card_scale = cardScaleInput ? cardScaleInput.value : (currentSettings.layout_card_scale || '100');
-    currentSettings.card_width = cardWidthSelect ? cardWidthSelect.value : (currentSettings.card_width || '100%');
-    
-    // layout_card_style is already updated by click listeners
-    
-    currentSettings.card_title_font = cardTitleFontInput.value.trim();
-    currentSettings.card_title_size = cardTitleSizeInput.value.trim();
-    currentSettings.card_title_color = cardTitleColorInput.value.trim();
-    currentSettings.card_desc_font = cardDescFontInput.value.trim();
-    currentSettings.card_desc_size = cardDescSizeInput.value.trim();
-    currentSettings.card_desc_color = cardDescColorInput.value.trim();
-
-    saveSettings();
   });
 
   if (frostedGlassSwitch) {

@@ -384,25 +384,15 @@ export async function onRequest(context) {
       requestedCatalogName = '';
   }
 
-  let targetCategoryIds = [];
   let currentCatalogName = '';
   const catalogExists = requestedCatalogName && categoryIdMap.has(requestedCatalogName);
-  
+
   if (catalogExists) {
-      const rootId = categoryIdMap.get(requestedCatalogName);
       currentCatalogName = requestedCatalogName;
-      
-      // 用户要求：仅显示当前分类的数据，不包含子分类
-      targetCategoryIds.push(rootId);
   }
 
-  // 根据分类过滤站点
-  let sites = [];
-  if (targetCategoryIds.length > 0) {
-    sites = allSites.filter(site => targetCategoryIds.includes(site.catelog_id));
-  } else {
-    sites = allSites;
-  }
+  // 始终展示全部站点（分类导航改为定位分组模式）
+  let sites = allSites;
 
   // 随机壁纸轮询
   let nextWallpaperIndex = 0;
