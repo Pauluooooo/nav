@@ -1253,13 +1253,13 @@ export async function onRequest(context) {
       // transform: scale(1.02) 是为了防止模糊后边缘出现白边
       
       bgLayerHtml = `
-        <div id="fixed-background" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;">
+        <div id="fixed-background" style="position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;">
           <img src="${safeWallpaperUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; ${blurStyle}" />
         </div>
       `;
   } else {
       bgLayerHtml = `
-        <div id="fixed-background" style="position: absolute; inset: 0; z-index: -1; pointer-events: none; background-color: ${defaultBgColor};"></div>
+        <div id="fixed-background" style="position: fixed; inset: 0; z-index: -1; pointer-events: none; background-color: ${defaultBgColor};"></div>
       `;
   }
   

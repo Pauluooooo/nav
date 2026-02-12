@@ -1269,9 +1269,6 @@ body.drag-sorting .site-card:hover {
 @media (max-width: 768px) {
   #fixed-background .wallpaper-image,
   #fixed-background img {
-    width: 100vw;
-    height: 100dvh;
-    max-width: none;
     object-position: center top;
     transform: scale(1) !important;
   }

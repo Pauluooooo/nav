@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const backToTop = document.getElementById('backToTop');
   
   const toggleBackToTop = () => {
-    if (getCurrentScrollTop() > 100) {
+    if (getCurrentScrollTop() > 0) {
       backToTop?.classList.remove('opacity-0', 'invisible');
     } else {
       backToTop?.classList.add('opacity-0', 'invisible');
@@ -644,13 +644,6 @@ document.addEventListener('DOMContentLoaded', function() {
         updateHeading(currentSearchKeyword, catalogName || null, groupVisibleCount);
         history.pushState(null, '', href);
     }
-
-    // In grouped-home mode, remember the last located group id.
-    if (config.rememberLastCategory) {
-        const rememberValue = catalogId ? String(catalogId) : 'all';
-        localStorage.setItem('iori_last_category', rememberValue);
-        setCookie('iori_last_category', rememberValue, 365);
-    }
   });
 
   function setCookie(name, value, days) {
@@ -1179,51 +1172,15 @@ document.addEventListener('DOMContentLoaded', function() {
       return 'https://' + url;
   }
 
-  // Auto-restore Last Category
+  // Auto-restore Last Category (disabled — always show all on refresh)
   (function() {
-      const config = window.IORI_LAYOUT_CONFIG || {};
       const urlParams = new URLSearchParams(window.location.search);
       const hasCatalogParam = urlParams.has('catalog');
-
       if (hasCatalogParam) return;
 
       const visibleCount = ensureAllSitesRenderedForGroupedView();
-
-      if (!config.rememberLastCategory) {
-          updateHeading(currentSearchKeyword, null, visibleCount);
-          updateNavigationState(null);
-          return;
-      }
-
-      let lastId = localStorage.getItem('iori_last_category');
-      if (!lastId) {
-          const match = document.cookie.match(/iori_last_category=(all|\d+)/);
-          if (match) {
-              lastId = match[1];
-          }
-      }
-
-      if (!lastId || lastId === 'all') {
-          updateHeading(currentSearchKeyword, null, visibleCount);
-          updateNavigationState(null);
-          return;
-      }
-
-      const link = document.querySelector(`a[data-id="${lastId}"]`);
-      if (!link) {
-          localStorage.removeItem('iori_last_category');
-          updateHeading(currentSearchKeyword, null, visibleCount);
-          updateNavigationState(null);
-          return;
-      }
-
-      const catalogName = link.innerText.trim();
-      updateNavigationState(lastId);
-      const targetSection = locateCategoryGroup(lastId, catalogName);
-      const groupVisibleCount = targetSection
-          ? targetSection.querySelectorAll('.site-card:not(.hidden)').length
-          : visibleCount;
-      updateHeading(currentSearchKeyword, catalogName, groupVisibleCount);
+      updateHeading(currentSearchKeyword, null, visibleCount);
+      updateNavigationState(null);
   })();
 
   // Theme Toggle + Time Auto Mode
