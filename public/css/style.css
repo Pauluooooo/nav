@@ -375,6 +375,11 @@ body.layout-unified #horizontalCategoryNav .catalog-chip[data-level="4"] {
     margin: 0 auto;
 }
 
+/* Keep fallback icon hidden until image load fails and JS removes .hidden. */
+.site-card .site-icon > div.hidden {
+    display: none !important;
+}
+
 @media (max-width: 400px) {
     .site-card.style-2 .site-icon img, .site-card.style-2 .site-icon div {
         margin: 0 auto;
@@ -1243,24 +1248,20 @@ body.drag-sorting .site-card:hover {
     margin-right: 0.7rem !important;
   }
 
-  .site-card .site-icon img,
-  .site-card .site-icon div {
+  .site-card .site-icon > img,
+  .site-card .site-icon > div:not(.hidden) {
     width: 100% !important;
     height: 100% !important;
     max-width: 100%;
     max-height: 100%;
     border-radius: inherit !important;
+  }
+
+  .site-card .site-icon > img {
     display: block;
-  }
-
-  .site-card .site-icon img {
-    object-fit: contain !important;
-    padding: 0.14rem;
-    background: rgba(15, 23, 42, 0.04);
-  }
-
-  .dark .site-card .site-icon img {
-    background: rgba(148, 163, 184, 0.16);
+    object-fit: cover !important;
+    padding: 0;
+    background: transparent;
   }
 
   .site-card .site-title {
