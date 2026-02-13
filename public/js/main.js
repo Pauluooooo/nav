@@ -73,7 +73,8 @@ document.addEventListener('DOMContentLoaded', function() {
       window.requestIdleCallback(() => task(), { timeout });
       return;
     }
-    setTimeout(task, 0);
+    const delay = Math.max(0, Number(timeout) || 0);
+    setTimeout(task, delay);
   }
 
   function waitForIdle(timeout = 300) {
@@ -153,30 +154,31 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // ========== Copy Link ==========
-  document.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      const url = this.getAttribute('data-url');
-      if (!url) return;
-      
-      navigator.clipboard.writeText(url).then(() => {
-        showCopySuccess(this);
-      }).catch(() => {
-        // Clipboard fallback.
-        const textarea = document.createElement('textarea');
-        textarea.value = url;
-        textarea.style.position = 'fixed';
-        document.body.appendChild(textarea);
-        textarea.select();
-        try {
-          document.execCommand('copy');
-          showCopySuccess(this);
-        } catch (e) {
-          alert('Copy failed. Please copy manually.');
-        }
-        document.body.removeChild(textarea);
-      });
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.copy-btn');
+    if (!btn) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const url = btn.getAttribute('data-url');
+    if (!url) return;
+
+    navigator.clipboard.writeText(url).then(() => {
+      showCopySuccess(btn);
+    }).catch(() => {
+      // Clipboard fallback.
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      textarea.style.position = 'fixed';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showCopySuccess(btn);
+      } catch (e) {
+        alert('Copy failed. Please copy manually.');
+      }
+      document.body.removeChild(textarea);
     });
   });
   
@@ -498,23 +500,6 @@ document.addEventListener('DOMContentLoaded', function() {
   updateHeading();
   groupRenderedCards();
 
-  // ========== Hitokoto API ==========
-  const hitokotoContainer = document.querySelector('#hitokoto')?.parentElement;
-  // Skip request if the target container is hidden.
-  if (hitokotoContainer && !hitokotoContainer.classList.contains('hidden')) {
-    console.log('[Debug] Fetching hitokoto...');
-    fetch('https://v1.hitokoto.cn')
-      .then(res => res.json())
-      .then(data => {
-        const hitokoto = document.getElementById('hitokoto_text');
-        if (hitokoto) {
-          hitokoto.href = `https://hitokoto.cn/?uuid=${data.uuid}`;
-          hitokoto.innerText = data.hitokoto;
-        }
-      })
-      .catch(console.error);
-  }
-
   // Initial URL-based category jump is intentionally disabled.
   (function initialCatalogScroll() {
       // Intentionally left blank.
@@ -566,14 +551,27 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function ensureAllSitesRenderedForGroupedView() {
-      if (!Array.isArray(window.IORI_SITES)) return 0;
+      if (!Array.isArray(window.IORI_SITES) || !sitesGrid) return 0;
       const allSites = window.IORI_SITES;
-      const renderedCount = sitesGrid?.querySelectorAll('.site-card').length || 0;
-      const isGrouped = sitesGrid?.classList.contains('sites-grid-grouped');
-      if (!isGrouped || renderedCount !== allSites.length) {
+      const renderedCount = sitesGrid.querySelectorAll('.site-card').length;
+      const isGrouped = sitesGrid.classList.contains('sites-grid-grouped');
+
+      if (!isGrouped) {
+          // Reuse server-rendered cards when possible to avoid full DOM rebuild on first load.
+          if (renderedCount === allSites.length && renderedCount > 0) {
+              groupRenderedCards();
+              if (currentSearchKeyword) {
+                  filterVisibleCards(currentSearchKeyword);
+              }
+          } else {
+              renderSites(allSites);
+          }
+      } else if (renderedCount !== allSites.length) {
+          // Keep UI in sync when runtime data differs from DOM.
           renderSites(allSites);
       }
-      return sitesGrid?.querySelectorAll('.site-card:not(.hidden)').length || 0;
+
+      return sitesGrid.querySelectorAll('.site-card:not(.hidden)').length;
   }
 
   // ========== AJAX Navigation ==========
@@ -1218,7 +1216,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ========== Random Wallpaper Logic (Client-side) ==========
-  (async function() {
+  runWhenIdle(async () => {
       const config = window.IORI_LAYOUT_CONFIG || {};
       if (!config.randomWallpaper) return;
 
@@ -1275,5 +1273,5 @@ document.addEventListener('DOMContentLoaded', function() {
       } catch (e) {
           console.error('Failed to fetch random wallpaper:', e);
       }
-  })();
+  }, 1200);
 });
