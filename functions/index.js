@@ -1274,10 +1274,8 @@ export async function onRequest(context) {
       }
       #app-scroll {
         width: 100%;
-        height: 100vh;
-        height: 100svh;
-        min-height: 100vh;
-        min-height: 100svh;
+        height: var(--iori-stable-vh, 100svh);
+        min-height: var(--iori-stable-vh, 100svh);
         overflow-y: auto; /* 允许纵向滚动 */
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch; /* iOS 原生惯性滚动 */
@@ -1287,8 +1285,7 @@ export async function onRequest(context) {
       body {
         background-color: transparent !important;
         overflow: hidden; /* 禁止 body 滚动，交由 #app-scroll 管理 */
-        min-height: 100vh;
-        min-height: 100svh;
+        min-height: var(--iori-stable-vh, 100svh);
         position: relative;
       }
       #fixed-background {
@@ -1302,8 +1299,8 @@ export async function onRequest(context) {
       /* 修复 iOS 上 100vh 问题 (针对背景层) */
       @supports (-webkit-touch-callout: none) {
         #app-scroll {
-          height: 100svh;
-          min-height: 100svh;
+          height: var(--iori-stable-vh, 100svh);
+          min-height: var(--iori-stable-vh, 100svh);
         }
       }
     </style>

@@ -18,19 +18,18 @@ document.addEventListener('DOMContentLoaded', function() {
     return Math.max(appScrollTop, windowScrollTop);
   }
 
-  function resetScrollToTop() {
+  function forceScrollTopNow() {
     if (appScroll) appScroll.scrollTop = 0;
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+  }
 
-    // Run one more frame to override late browser restoration.
-    requestAnimationFrame(() => {
-      if (appScroll) appScroll.scrollTop = 0;
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    });
+  function resetScrollToTop() {
+    forceScrollTopNow();
+    // Run extra passes to override late scroll restoration on mobile browsers.
+    requestAnimationFrame(forceScrollTopNow);
+    setTimeout(forceScrollTopNow, 120);
   }
 
   function smoothScrollTo(top) {
@@ -64,6 +63,62 @@ document.addEventListener('DOMContentLoaded', function() {
   function waitForIdle(timeout = 300) {
     return new Promise((resolve) => runWhenIdle(resolve, timeout));
   }
+
+  function isEditableTarget(target) {
+    if (!(target instanceof HTMLElement)) return false;
+    return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+  }
+
+  function setupViewportStability() {
+    const bgContainer = document.getElementById('fixed-background');
+    if (!bgContainer) return;
+
+    const root = document.documentElement;
+    let stableHeight = Math.max(window.innerHeight || 0, window.visualViewport?.height || 0);
+
+    const applyStableHeight = (height) => {
+      const nextHeight = Math.max(320, Math.round(height || window.innerHeight || 0));
+      stableHeight = nextHeight;
+      root.style.setProperty('--iori-stable-vh', `${nextHeight}px`);
+    };
+
+    const isKeyboardLikelyOpen = () => {
+      const active = document.activeElement;
+      if (!isEditableTarget(active)) return false;
+      const vvHeight = window.visualViewport?.height;
+      if (!vvHeight) return true;
+      return stableHeight - vvHeight > 120;
+    };
+
+    const syncStableHeight = () => {
+      const keyboardOpen = isKeyboardLikelyOpen();
+      document.body.classList.toggle('keyboard-open', keyboardOpen);
+      if (keyboardOpen) return;
+      const vvHeight = window.visualViewport?.height;
+      const currentHeight = Math.max(window.innerHeight || 0, vvHeight || 0);
+      if (!currentHeight || Math.abs(currentHeight - stableHeight) < 8) return;
+      applyStableHeight(currentHeight);
+    };
+
+    const updateKeyboardState = () => {
+      const keyboardOpen = isKeyboardLikelyOpen();
+      document.body.classList.toggle('keyboard-open', keyboardOpen);
+      if (!keyboardOpen) {
+        setTimeout(syncStableHeight, 160);
+      }
+    };
+
+    applyStableHeight(stableHeight);
+    window.addEventListener('resize', syncStableHeight, { passive: true });
+    window.addEventListener('orientationchange', () => setTimeout(syncStableHeight, 200), { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncStableHeight, { passive: true });
+    }
+    document.addEventListener('focusin', updateKeyboardState, true);
+    document.addEventListener('focusout', () => setTimeout(updateKeyboardState, 0), true);
+  }
+
+  setupViewportStability();
   
   function openSidebar() {
     sidebar?.classList.add('open');
@@ -132,56 +187,57 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // ========== 返回顶部 ==========
-    const backToTop = document.getElementById('backToTop');
+  const backToTop = document.getElementById('backToTop');
 
-    function showBackToTop() {
-        if (!backToTop) return;
-        backToTop.classList.remove('opacity-0', 'invisible');
-        backToTop.classList.add('opacity-100', 'visible');
-    }
+  function setBackToTopVisibility(visible) {
+      if (!backToTop) return;
+      backToTop.classList.toggle('back-to-top-visible', !!visible);
+  }
 
-    function hideBackToTop() {
-        if (!backToTop) return;
-        backToTop.classList.remove('opacity-100', 'visible');
-        backToTop.classList.add('opacity-0', 'invisible');
-    }
+  function setupBackToTopController() {
+      if (!backToTop) return;
+      backToTop.classList.remove('opacity-0', 'opacity-100', 'invisible', 'visible');
 
-    const toggleBackToTop = () => {
-        const scrollTop = getCurrentScrollTop();
-        if (scrollTop > 0) showBackToTop();
-        else hideBackToTop();
-    };
+      const threshold = 80;
+      let rafId = 0;
 
-    // Show immediately on various user interactions that indicate downward intent
-    function handleWheel(e) {
-        if (e.deltaY > 0) showBackToTop();
-    }
+      const syncVisibility = () => {
+          rafId = 0;
+          setBackToTopVisibility(getCurrentScrollTop() > threshold);
+      };
 
-    function handleTouchStart(e) {
-        // If touch starts and page is not at top, show immediately
-        const t = e.touches && e.touches[0];
-        if (t && getCurrentScrollTop() > 0) showBackToTop();
-    }
+      const requestSync = () => {
+          if (rafId) return;
+          rafId = requestAnimationFrame(syncVisibility);
+      };
 
-    function handleKeyDown(e) {
-        // PageDown, ArrowDown, Space indicate downward movement
-        if (['PageDown', 'ArrowDown', ' '].includes(e.key)) showBackToTop();
-    }
+      const showOnDownwardIntent = () => {
+          if (getCurrentScrollTop() > 0) {
+              setBackToTopVisibility(true);
+          }
+      };
 
-    scrollContainer.addEventListener('scroll', toggleBackToTop, { passive: true });
-    if (appScroll) {
-        window.addEventListener('scroll', toggleBackToTop, { passive: true });
-    }
-    window.addEventListener('wheel', handleWheel, { passive: true });
-    window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    window.addEventListener('keydown', handleKeyDown, { passive: true });
+      scrollContainer.addEventListener('scroll', requestSync, { passive: true });
+      if (appScroll) {
+          window.addEventListener('scroll', requestSync, { passive: true });
+      }
+      window.addEventListener('wheel', (event) => {
+          if (event.deltaY > 0) showOnDownwardIntent();
+      }, { passive: true });
+      window.addEventListener('touchmove', showOnDownwardIntent, { passive: true });
+      window.addEventListener('keydown', (event) => {
+          if (['PageDown', 'ArrowDown', ' '].includes(event.key)) showOnDownwardIntent();
+      }, { passive: true });
 
-    // 初始化时检查一次
-    toggleBackToTop();
+      backToTop.addEventListener('click', (event) => {
+          event.preventDefault();
+          smoothScrollTo(0);
+      });
 
-    backToTop?.addEventListener('click', function() {
-        smoothScrollTo(0);
-    });
+      requestSync();
+  }
+
+  setupBackToTopController();
   
   // ========== 模态框控制 ==========
   const addSiteModal = document.getElementById('addSiteModal');
@@ -669,7 +725,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const visibleCount = ensureAllSitesRenderedForGroupedView();
-    const config = window.IORI_LAYOUT_CONFIG || {};
 
     if (!catalogId) {
         updateNavigationState(null);
@@ -1213,38 +1268,42 @@ document.addEventListener('DOMContentLoaded', function() {
       return 'https://' + url;
   }
 
-  // Auto-restore Last Category (disabled — always show all on refresh)
-  (function() {
-      // 清除 URL 中的 catalog 参数，确保每次刷新都显示全部分类
-      const urlParams = new URLSearchParams(window.location.search);
-      const hasCatalogParam = urlParams.has('catalog');
+  // Always reset to "All categories" whenever the page is (re)shown.
+  function stripCatalogParamFromUrl() {
+      const currentUrl = new URL(window.location.href);
+      let changed = false;
 
-      // 如果 URL 中有 catalog 参数，清除它
-      if (hasCatalogParam) {
-          // 使用 replaceState 清除 URL 参数，不触发页面刷新
-          const newUrl = window.location.pathname;
-          history.replaceState(null, '', newUrl);
+      if (currentUrl.searchParams.has('catalog')) {
+          currentUrl.searchParams.delete('catalog');
+          changed = true;
+      }
+      if (currentUrl.hash) {
+          currentUrl.hash = '';
+          changed = true;
       }
 
+      if (changed) {
+          history.replaceState(null, '', `${currentUrl.pathname}${currentUrl.search}`);
+      }
+  }
+
+  function resetCatalogViewToAll(options = {}) {
+      const shouldResetScroll = options.withScrollReset !== false;
+      stripCatalogParamFromUrl();
       const visibleCount = ensureAllSitesRenderedForGroupedView();
       updateHeading(currentSearchKeyword, null, visibleCount);
       updateNavigationState(null);
-      // 强制滚动到顶部，覆盖浏览器的滚动位置恢复
-      resetScrollToTop();
-  })();
-
-  window.addEventListener('load', resetScrollToTop, { once: true });
-
-  // 处理 bfcache（前进后退缓存）恢复时重置分类状态
-  window.addEventListener('pageshow', function(event) {
-      if (event.persisted) {
-          ensureAllSitesRenderedForGroupedView();
-          updateNavigationState(null);
-          updateHeading(currentSearchKeyword, null);
+      if (shouldResetScroll) {
           resetScrollToTop();
       }
-  });
+  }
 
+  resetCatalogViewToAll({ withScrollReset: true });
+  window.addEventListener('load', () => resetCatalogViewToAll({ withScrollReset: true }), { once: true });
+  window.addEventListener('pageshow', () => resetCatalogViewToAll({ withScrollReset: true }));
+  window.addEventListener('popstate', () => resetCatalogViewToAll({ withScrollReset: true }));
+  window.addEventListener('pagehide', forceScrollTopNow);
+  window.addEventListener('beforeunload', forceScrollTopNow);
   // Theme Toggle + Time Auto Mode
   const themeToggleBtn = document.getElementById('themeToggleBtn');
   const themeConfig = window.IORI_LAYOUT_CONFIG || {};
@@ -1340,21 +1399,6 @@ document.addEventListener('DOMContentLoaded', function() {
           showToast('已恢复自动主题模式');
       });
   }
-
-  // ========== Mobile Keyboard Background Stability ==========
-  // 禁用背景移动功能，保持壁纸固定
-  (function() {
-      const bgContainer = document.getElementById('fixed-background');
-      if (!bgContainer) return;
-
-      // 确保背景容器始终固定，不随键盘移动
-      bgContainer.style.position = 'fixed';
-      bgContainer.style.top = '0';
-      bgContainer.style.left = '0';
-      bgContainer.style.width = '100%';
-      bgContainer.style.height = '100%';
-      bgContainer.style.transform = 'none';
-  })();
 
   // ========== Random Wallpaper Logic (Client-side) ==========
   (async function() {
