@@ -1,11 +1,11 @@
-# Static Assets - Cache for 1 year (Immutable)
-# Because we use query params for versioning (?v=hash), it is safe to cache aggressively.
+# CSS/JS: always revalidate to avoid stale front-end logic when version tags are not updated in every deploy path.
 /css/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=0, must-revalidate
 
 /js/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=0, must-revalidate
 
+# Other static assets can still cache aggressively.
 /favicon.svg
   Cache-Control: public, max-age=31536000, immutable
 
