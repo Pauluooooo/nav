@@ -1296,18 +1296,61 @@ body.drag-sorting .site-card:hover {
 /* ========== Back To Top ========== */
 #backToTop {
   z-index: 70;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(12px);
-  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background-color: rgba(248, 250, 252, 0.92);
+  color: #1f2937;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0.96;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#backToTop svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.25;
+}
+
+#backToTop:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.28);
+}
+
+.dark #backToTop {
+  border-color: rgba(148, 163, 184, 0.4);
+  background-color: rgba(31, 41, 55, 0.92);
+  color: #f3f4f6;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+}
+
+#backToTop.is-at-top {
+  opacity: 0.6;
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.18);
+}
+
+#backToTop.is-at-top:hover {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.18);
+}
+
+#backToTop[aria-disabled="true"] {
+  cursor: default;
 }
 
 #backToTop.back-to-top-visible {
-  opacity: 1;
+  opacity: 0.96;
   visibility: visible;
   pointer-events: auto;
   transform: translateY(0);
@@ -1315,8 +1358,8 @@ body.drag-sorting .site-card:hover {
 
 @media (max-width: 640px) {
   #backToTop {
-    right: 1rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+    right: 0.9rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 0.9rem);
   }
 }
 

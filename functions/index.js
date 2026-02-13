@@ -127,9 +127,10 @@ export async function onRequest(context) {
   let shouldClearCookie = false;
   const rawCommitSha = String(env.CF_PAGES_COMMIT_SHA || '').trim();
   const hasStableDeploymentTag = rawCommitSha.length > 0;
-  const deploymentTag = String(hasStableDeploymentTag ? rawCommitSha : 'nocache')
+  const fallbackDeploymentTag = `dev_${Date.now().toString(36)}`;
+  const deploymentTag = String(hasStableDeploymentTag ? rawCommitSha : fallbackDeploymentTag)
     .replace(/[^a-zA-Z0-9_-]/g, '')
-    .slice(0, 16) || 'nocache';
+    .slice(0, 16) || fallbackDeploymentTag;
   const cacheKeyPublic = 'home_html_' + deploymentTag + '_public';
   const cacheKeyPrivate = 'home_html_' + deploymentTag + '_private';
   const allowHomeCache = isHomePage && hasStableDeploymentTag;
