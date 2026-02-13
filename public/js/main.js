@@ -202,18 +202,26 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!backToTop) return;
       backToTop.classList.remove('opacity-0', 'opacity-100', 'invisible', 'visible');
 
+      const SHOW_AFTER_PX = 16;
+      const TOP_EPSILON_PX = 2;
+      const SHORT_PAGE_RATIO = 0.5;
       let rafId = 0;
 
       const resolveThreshold = () => {
           const maxScroll = getMaxScrollTop();
           if (maxScroll <= 0) return Number.POSITIVE_INFINITY;
-          return Math.max(16, Math.min(80, Math.round(maxScroll * 0.12)));
+          return Math.max(1, Math.min(SHOW_AFTER_PX, Math.floor(maxScroll * SHORT_PAGE_RATIO)));
       };
 
       const syncVisibility = () => {
           rafId = 0;
+          const currentTop = getCurrentScrollTop();
+          if (currentTop <= TOP_EPSILON_PX) {
+              setBackToTopVisibility(false);
+              return;
+          }
           const threshold = resolveThreshold();
-          setBackToTopVisibility(getCurrentScrollTop() > threshold);
+          setBackToTopVisibility(currentTop >= threshold);
       };
 
       const requestSync = () => {
@@ -222,9 +230,11 @@ document.addEventListener('DOMContentLoaded', function() {
       };
 
       const showOnDownwardIntent = () => {
-          if (getMaxScrollTop() > 0 && getCurrentScrollTop() > 0) {
+          if (getCurrentScrollTop() > TOP_EPSILON_PX) {
               setBackToTopVisibility(true);
+              return;
           }
+          requestSync();
       };
 
       scrollContainer.addEventListener('scroll', requestSync, { passive: true });
