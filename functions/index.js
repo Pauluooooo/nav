@@ -1069,7 +1069,8 @@ export async function onRequest(context) {
   // 鏇挎崲 body 鏍囩缁撴瀯锛屽鍔?#app-scroll 婊氬姩瀹瑰櫒
   html = html.replace('<body class="bg-secondary-50 font-sans text-gray-800">', `<body class="bg-secondary-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-100 relative layout-unified ${isCustomWallpaper ? 'custom-wallpaper' : ''}">${bgLayerHtml}<div id="app-scroll">`);
   
-  // 闂悎婊氬姩瀹瑰櫒锛堝湪 </main> 鍚庡叧闂紝浣?#backToTop 鍜屾ā鎬佹鑴辩 #app-scroll 鐨勫眰鍙犱笂涓嬫枃锛?  html = html.replace('</main>', '</main></div>');
+  // Close #app-scroll after </main> so fixed layers are not trapped in the scroll container.
+  html = html.replace('</main>', '</main></div>');
   
   // Inject Card CSS Variables
   const cardRadius = parseInt(layoutCardBorderRadius) || 12;

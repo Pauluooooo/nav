@@ -14,6 +14,26 @@ document.addEventListener('DOMContentLoaded', function() {
     return Math.max(appScrollTop, windowScrollTop);
   }
 
+  function getMaxScrollTop() {
+    if (appScroll) {
+      const scrollHeight = Number(appScroll.scrollHeight || 0);
+      const clientHeight = Number(appScroll.clientHeight || 0);
+      return Math.max(0, scrollHeight - clientHeight);
+    }
+
+    const doc = document.documentElement;
+    const body = document.body;
+    const scrollHeight = Math.max(
+      Number(doc?.scrollHeight || 0),
+      Number(body?.scrollHeight || 0)
+    );
+    const clientHeight = Math.max(
+      Number(doc?.clientHeight || 0),
+      Number(window.innerHeight || 0)
+    );
+    return Math.max(0, scrollHeight - clientHeight);
+  }
+
   function forceScrollTopNow() {
     if (appScroll) appScroll.scrollTop = 0;
     window.scrollTo(0, 0);
@@ -182,11 +202,17 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!backToTop) return;
       backToTop.classList.remove('opacity-0', 'opacity-100', 'invisible', 'visible');
 
-      const threshold = 80;
       let rafId = 0;
+
+      const resolveThreshold = () => {
+          const maxScroll = getMaxScrollTop();
+          if (maxScroll <= 0) return Number.POSITIVE_INFINITY;
+          return Math.max(16, Math.min(80, Math.round(maxScroll * 0.12)));
+      };
 
       const syncVisibility = () => {
           rafId = 0;
+          const threshold = resolveThreshold();
           setBackToTopVisibility(getCurrentScrollTop() > threshold);
       };
 
@@ -196,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
       };
 
       const showOnDownwardIntent = () => {
-          if (getCurrentScrollTop() > 0) {
+          if (getMaxScrollTop() > 0 && getCurrentScrollTop() > 0) {
               setBackToTopVisibility(true);
           }
       };
@@ -212,6 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
       window.addEventListener('keydown', (event) => {
           if (['PageDown', 'ArrowDown', ' '].includes(event.key)) showOnDownwardIntent();
       }, { passive: true });
+      window.addEventListener('resize', requestSync, { passive: true });
 
       backToTop.addEventListener('click', (event) => {
           event.preventDefault();
