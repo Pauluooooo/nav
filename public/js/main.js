@@ -1,10 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
-  // 绂佺敤娴忚鍣ㄨ嚜鍔ㄦ粴鍔ㄦ仮澶嶏紝纭繚鍒锋柊鍚庡缁堜粠椤堕儴寮€濮?
+  // Disable browser scroll restoration to keep a consistent top-start state.
   if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual';
   }
 
-  // ========== 渚ц竟鏍忔帶鍒?==========
+  // ========== Scroll Helpers ==========
   const appScroll = document.getElementById('app-scroll');
   const scrollContainer = appScroll || window;
 
@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }, { once: true });
   });
   
-  // ========== 澶嶅埗閾炬帴鍔熻兘 ==========
+  // ========== Copy Link ==========
   document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', function(e) {
       e.preventDefault();
@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
       navigator.clipboard.writeText(url).then(() => {
         showCopySuccess(this);
       }).catch(() => {
-        // 澶囩敤鏂规硶
+        // Clipboard fallback.
         const textarea = document.createElement('textarea');
         textarea.value = url;
         textarea.style.position = 'fixed';
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2000);
   }
   
-  // ========== 杩斿洖椤堕儴 ==========
+  // ========== Back To Top ==========
   const backToTop = document.getElementById('backToTop');
 
   function setBackToTopVisibility(visible) {
@@ -204,14 +204,27 @@ document.addEventListener('DOMContentLoaded', function() {
       backToTop.classList.add('back-to-top-visible');
 
       const TOP_EPSILON_PX = 2;
+      const desktopMediaQuery = window.matchMedia('(min-width: 1024px)');
       let rafId = 0;
 
       const syncBackToTopState = () => {
           rafId = 0;
+          const isDesktop = desktopMediaQuery.matches;
           const currentTop = getCurrentScrollTop();
+
+          // Desktop has its own adaptation: always visible and clickable.
+          backToTop.classList.toggle('desktop-mode', isDesktop);
+          if (isDesktop) {
+              backToTop.classList.remove('is-at-top');
+              backToTop.setAttribute('aria-disabled', 'false');
+              setBackToTopVisibility(true);
+              return;
+          }
+
           const isAtTop = currentTop <= TOP_EPSILON_PX;
           backToTop.classList.toggle('is-at-top', isAtTop);
           backToTop.setAttribute('aria-disabled', isAtTop ? 'true' : 'false');
+          setBackToTopVisibility(true);
       };
 
       const requestSync = () => {
@@ -235,6 +248,11 @@ document.addEventListener('DOMContentLoaded', function() {
           if (['PageDown', 'ArrowDown', ' '].includes(event.key)) showOnDownwardIntent();
       }, { passive: true });
       window.addEventListener('resize', requestSync, { passive: true });
+      if (typeof desktopMediaQuery.addEventListener === 'function') {
+          desktopMediaQuery.addEventListener('change', requestSync);
+      } else if (typeof desktopMediaQuery.addListener === 'function') {
+          desktopMediaQuery.addListener(requestSync);
+      }
 
       backToTop.addEventListener('click', (event) => {
           event.preventDefault();
@@ -247,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   setupBackToTopController();
   
-  // ========== 妯℃€佹鎺у埗 ==========
+  // ========== Modal Controls ==========
   const addSiteModal = document.getElementById('addSiteModal');
   const addSiteBtnSidebar = document.getElementById('addSiteBtnSidebar');
   const closeModalBtn = document.getElementById('closeModal');
@@ -302,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.target === addSiteModal) closeModal();
   });
   
-  // ========== 琛ㄥ崟鎻愪氦 ==========
+  // ========== Form Submit ==========
   addSiteForm?.addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -347,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2500);
   }
   
-  // ========== 鎼滅储鍔熻兘 ==========
+  // ========== Search ==========
   const searchInputs = document.querySelectorAll('.search-input-target');
   const sitesGrid = document.getElementById('sitesGrid');
   
@@ -476,13 +494,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // 鍒濇鍔犺浇鏃舵牴鎹睆骞曞搴︿慨姝ｆ爣棰樻樉绀?
+  // Ensure heading text is initialized with the current viewport state.
   updateHeading();
   groupRenderedCards();
 
-  // ========== 涓€瑷€ API ==========
+  // ========== Hitokoto API ==========
   const hitokotoContainer = document.querySelector('#hitokoto')?.parentElement;
-  // 妫€鏌ュ鍣ㄦ槸鍚﹁闅愯棌锛屽鏋滈殣钘忓垯涓嶅彂璧疯姹?
+  // Skip request if the target container is hidden.
   if (hitokotoContainer && !hitokotoContainer.classList.contains('hidden')) {
     console.log('[Debug] Fetching hitokoto...');
     fetch('https://v1.hitokoto.cn')
@@ -497,7 +515,7 @@ document.addEventListener('DOMContentLoaded', function() {
       .catch(console.error);
   }
 
-  // 宸茬鐢ㄩ〉闈㈠垵娆℃牴鎹?URL 瀹氫綅鍒嗙被鐨勮嚜鍔ㄨ烦杞紝浠ョ‘淇濇瘡娆″埛鏂伴兘鏄剧ず鍏ㄩ儴鍒嗙被
+  // Initial URL-based category jump is intentionally disabled.
   (function initialCatalogScroll() {
       // Intentionally left blank.
   })();
@@ -939,12 +957,12 @@ document.addEventListener('DOMContentLoaded', function() {
       const sitesGrid = document.getElementById('sitesGrid');
       if (!sitesGrid) return;
       
-      // 浣跨敤鍏ㄥ眬閰嶇疆鑾峰彇甯冨眬璁剧疆锛岄伩鍏嶄緷璧?DOM 鎺ㄦ柇
+      // Read layout from global config instead of inferring from DOM.
       const config = window.IORI_LAYOUT_CONFIG || {};
       const cardStyle = config.cardStyle || 'style1';
       const useCompactCard = true;
       
-      // 浼樺厛浠庨厤缃幏鍙栨瘺鐜荤拑寮€鍏崇姸鎬侊紝CSS 鍙橀噺浣滀负鍥為€€
+      // Prefer runtime config for frosted-glass state, CSS var is fallback.
       const computedStyle = getComputedStyle(document.documentElement);
       const frostedBlurVal = computedStyle.getPropertyValue('--frosted-glass-blur').trim();
       const isFrostedEnabled = config.enableFrostedGlass !== undefined 
@@ -994,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Remove animation class after completion to ensure clean state
         card.addEventListener('animationend', () => {
             card.classList.remove('card-anim-enter');
-            card.style.animation = 'none'; // 褰诲簳绂佺敤鍔ㄧ敾锛岄槻姝㈠共鎵?Hover
+            card.style.animation = 'none'; // Disable residual animation to avoid hover interference.
             if (delay > 0) card.style.removeProperty('animation-delay');
         }, { once: true });
         
@@ -1055,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   }
 
-  // 杈呭姪鍑芥暟
+  // Helper functions
   function escapeHTML(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');

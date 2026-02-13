@@ -1349,11 +1349,30 @@ body.drag-sorting .site-card:hover {
   cursor: default;
 }
 
+#backToTop.desktop-mode,
+#backToTop.desktop-mode.is-at-top {
+  opacity: 0.95;
+}
+
 #backToTop.back-to-top-visible {
   opacity: 0.96;
   visibility: visible;
   pointer-events: auto;
   transform: translateY(0);
+}
+
+@media (min-width: 1024px) {
+  #backToTop {
+    width: 38px;
+    height: 38px;
+    right: clamp(1rem, calc((100vw - 1280px) / 2 + 1rem), 2.5rem);
+    bottom: 1.1rem;
+  }
+
+  #backToTop svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1395,7 +1414,7 @@ body.keyboard-open #fixed-background img {
   transition: none !important;
 }
 
-/* 绉诲姩绔紭鍖栵細纭繚澹佺焊瀹屽叏瑕嗙洊灞忓箷 */
+/* 移动端优化：确保壁纸完全覆盖屏幕 */
 @media (max-width: 768px) {
   #fixed-background {
     height: var(--iori-stable-vh, 100svh) !important;

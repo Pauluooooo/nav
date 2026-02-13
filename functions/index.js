@@ -2,7 +2,7 @@
 import { isAdminAuthenticated } from './_middleware';
 import { FONT_MAP, SCHEMA_VERSION } from './constants';
 
-// 杈呭姪鍑芥暟
+// Helper utilities
 function escapeHTML(str) {
   if (!str) return '';
   return String(str)
@@ -36,28 +36,28 @@ function normalizeSortOrder(val) {
   return Number.isFinite(num) ? num : 9999;
 }
 
-// 鍐呭瓨缂撳瓨锛氱儹鐘舵€佷笅璺宠繃 KV 璇诲彇锛屽彧鏈夊喎鍚姩鏃舵墠鏌?KV
+// In-memory schema migration flag to avoid repeated KV reads on warm instances.
 let schemaMigrated = false;
 
 async function ensureSchema(env) {
-  // 鐑姸鎬佺洿鎺ヨ繑鍥烇紝涓嶈 KV
+  // Warm instance fast-path.
   if (schemaMigrated) return;
 
-  // 鍐峰惎鍔ㄦ椂妫€鏌?KV 涓槸鍚﹀凡瀹屾垚杩佺Щ
+  // Cold start: check persisted migration state in KV.
   const migrated = await env.NAV_AUTH.get(`schema_migrated_${SCHEMA_VERSION}`);
   if (migrated) {
-    schemaMigrated = true;  // 鏇存柊鍐呭瓨缂撳瓨
+    schemaMigrated = true;
     return;
   }
 
   try {
-    // 鎵归噺鎵ц鎵€鏈夌储寮曞垱寤猴紙鍑忓皯鏁版嵁搴撳線杩旓級
+    // Create required indexes in a single batch.
     await env.NAV_DB.batch([
       env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_catelog_id ON sites(catelog_id)"),
       env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_sort_order ON sites(sort_order)")
     ]);
 
-    // 妫€鏌ュ苟娣诲姞缂哄け鐨勫垪锛堜娇鐢?PRAGMA 鏇撮珮鏁堬級
+    // Inspect schema and add missing columns.
     const sitesColumns = await env.NAV_DB.prepare("PRAGMA table_info(sites)").all();
     const sitesCols = new Set(sitesColumns.results.map(c => c.name));
     
@@ -86,12 +86,12 @@ async function ensureSchema(env) {
     }
 
     if (alterStatements.length > 0) {
-      // SQLite 涓嶆敮鎸佹壒閲?ALTER锛岄渶瑕侀€愪釜鎵ц
+      // SQLite does not support batched ALTER statements.
       for (const stmt of alterStatements) {
         try { await stmt.run(); } catch (e) { console.log('Column may already exist:', e.message); }
       }
       
-      // 鍚屾 catelog_name 鏁版嵁锛堜粎鍦ㄦ坊鍔犲瓧娈靛悗鎵ц涓€娆★級
+      // Backfill catelog_name once after the column is added.
       if (!sitesCols.has('catelog_name')) {
         await env.NAV_DB.prepare(`
           UPDATE sites 
@@ -101,8 +101,9 @@ async function ensureSchema(env) {
       }
     }
 
-    // 鏍囪杩佺Щ瀹屾垚锛堟案涔呯紦瀛橈紝鐩村埌 SCHEMA_VERSION 鍙樻洿锛?    await env.NAV_AUTH.put(`schema_migrated_${SCHEMA_VERSION}`, 'true');
-    schemaMigrated = true;  // 鏇存柊鍐呭瓨缂撳瓨
+    // Persist migration completion and update in-memory flag.
+    await env.NAV_AUTH.put(`schema_migrated_${SCHEMA_VERSION}`, 'true');
+    schemaMigrated = true;
     console.log('Schema migration completed');
   } catch (e) {
     console.error('Schema migration failed:', e);
@@ -112,12 +113,13 @@ async function ensureSchema(env) {
 export async function onRequest(context) {
   const { request, env } = context;
   
-  // 浣跨敤 KV 缂撳瓨 Schema 杩佺Щ鐘舵€侊紝閬垮厤姣忔鍐峰惎鍔ㄩ兘妫€鏌?  await ensureSchema(env);
+  // Ensure schema migration is applied (KV + memory guarded).
+  await ensureSchema(env);
 
   const isAuthenticated = await isAdminAuthenticated(request, env);
   const includePrivate = isAuthenticated ? 1 : 0;
 
-  // 1. 灏濊瘯璇诲彇 KV 缂撳瓨 (浠呴拡瀵规棤鏌ヨ鍙傛暟鐨勯椤佃姹?
+  // 1) Try reading homepage HTML cache (only for bare "/").
   const url = new URL(request.url);
   const isHomePage = url.pathname === '/' && !url.search;
   
@@ -159,7 +161,7 @@ export async function onRequest(context) {
     }
   }
 
-  // 骞惰鎵ц鏁版嵁搴撴煡璇紙鍒嗙被銆佽缃€佺珯鐐癸級
+  // Run category/settings/sites queries in parallel.
   const categoryQuery = isAuthenticated 
     ? 'SELECT * FROM category ORDER BY sort_order ASC, id ASC'
     : `SELECT * FROM category
@@ -197,14 +199,14 @@ export async function onRequest(context) {
                       END) = 0 OR ? = 1) 
                       ORDER BY sort_order ASC, create_time DESC`;
 
-  // 骞惰鎵ц鎵€鏈夋煡璇?
+  // Execute all queries concurrently.
   const [categoriesResult, settingsResult, sitesResult] = await Promise.all([
     env.NAV_DB.prepare(categoryQuery).all().catch(e => ({ results: [], error: e })),
     env.NAV_DB.prepare(`SELECT key, value FROM settings WHERE key IN (${settingsPlaceholders})`).bind(...settingsKeys).all().catch(e => ({ results: [], error: e })),
     env.NAV_DB.prepare(sitesQuery).bind(includePrivate).all().catch(e => ({ results: [], error: e }))
   ]);
 
-  // 澶勭悊鍒嗙被缁撴灉
+  // Normalize category tree result.
   let categories = categoriesResult.results || [];
   if (categoriesResult.error) {
     console.error('Failed to fetch categories:', categoriesResult.error);
@@ -237,7 +239,7 @@ export async function onRequest(context) {
   };
   sortCats(rootCategories);
 
-  // 澶勭悊璁剧疆缁撴灉
+  // Resolve homepage/layout settings.
   let layoutHideDesc = false;
   let layoutHideLinks = false;
   let layoutHideCategory = false;
@@ -362,20 +364,20 @@ export async function onRequest(context) {
   homeThemeAutoDarkStart = normalizeThemeHour(homeThemeAutoDarkStart, 19);
   homeThemeAutoDarkEnd = normalizeThemeHour(homeThemeAutoDarkEnd, 7);
 
-  // 澶勭悊绔欑偣缁撴灉
+  // Process site records.
   let allSites = sitesResult.results || [];
   if (sitesResult.error) {
     return new Response(`Failed to fetch sites: ${sitesResult.error.message}`, { status: 500 });
   }
 
-  // 纭畾鐩爣鍒嗙被
+  // Catalog is always "all" in unified layout mode.
   let currentCatalogName = '';
   const catalogExists = false;
 
-  // 濮嬬粓灞曠ず鍏ㄩ儴绔欑偣锛堝垎绫诲鑸敼涓哄畾浣嶅垎缁勬ā寮忥級
+  // Always render all sites; category nav only drives in-page grouping.
   let sites = allSites;
 
-  // 闅忔満澹佺焊杞
+  // Random wallpaper rotation.
   let nextWallpaperIndex = 0;
   if (layoutRandomWallpaper) {
     try {
@@ -499,7 +501,7 @@ export async function onRequest(context) {
 
   
 
-    // 4. 鐢熸垚鍔ㄦ€佽彍鍗?
+    // 4) Build dynamic category chips.
     const flattenCategories = (cats, level = 0, acc = []) => {
     if (!Array.isArray(cats)) return acc;
     cats.forEach((cat) => {
@@ -833,7 +835,7 @@ export async function onRequest(context) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    鍓嶅線绠＄悊鍚庡彴
+                    前往管理后台
                 </a>` : ''
             }
         </div>
@@ -842,10 +844,10 @@ export async function onRequest(context) {
 
   let gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 justify-items-center';
   if (layoutGridCols === '5') {
-      // 1024px+ 鏄剧ず 5 鍒?      gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 justify-items-center';
+      // 1024px+: show 5 columns.
+      gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 justify-items-center';
   } else if (layoutGridCols === '6') {
-      // 1024px+ 鏄剧ず 5 鍒? 1280px+ 鏄剧ず 6 鍒?(浼樺寲锛?200px 宸﹀彸涔熷彲灏濊瘯 6 鍒楋紝浣嗚€冭檻鍒颁晶杈规爮锛屼繚闄╄捣瑙?1280px 鍒?6 鍒楋紝浣?1024px 鍒?5 鍒楀凡缁忔瘮鍘熸潵 4 鍒楀ソ浜?
-      // 鐢ㄦ埛鍙嶉 1200px 鍙湁 4 鍒楀お灏戯紝鐜板湪 1200px 浼氭槸 5 鍒椼€?      // 涔熷彲浠ュ姞鍏?min-[1200px]:grid-cols-6
+      // 1024px+: 5 columns, 1200px+: 6 columns.
       gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 min-[1200px]:grid-cols-6 gap-3 sm:gap-6 justify-items-center';
   } else if (layoutGridCols === '7') {
       gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-6 justify-items-center';
@@ -1004,12 +1006,12 @@ export async function onRequest(context) {
   const safeWallpaperUrl = sanitizeUrl(layoutCustomWallpaper);
   const defaultBgColor = '#fdf8f3';
   
-  // 缁熶竴鏋勫缓鑳屾櫙灞傞€昏緫 - 閲囩敤 img 鏍囩鏂规浠ヨВ鍐崇Щ鍔ㄧ缂╂斁闂
+  // Build the fixed background layer (image strategy to avoid mobile zoom issues).
   let bgLayerHtml = '';
   
   if (safeWallpaperUrl) {
       const blurStyle = layoutEnableBgBlur ? `filter: blur(${layoutBgBlurIntensity}px); transform: scale(1.02);` : '';
-      // transform: scale(1.02) 鏄负浜嗛槻姝㈡ā绯婂悗杈圭紭鍑虹幇鐧借竟
+      // Slight scale avoids visible white edges after blur.
       
       bgLayerHtml = `
         <div id="fixed-background" style="position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;">
@@ -1022,7 +1024,7 @@ export async function onRequest(context) {
       `;
   }
   
-  // 娉ㄥ叆鍏ㄥ眬鏍峰紡
+  // Inject global scroll/layout styles.
   const globalScrollCss = `
     <style>
       html, body {
@@ -1035,27 +1037,27 @@ export async function onRequest(context) {
         width: 100%;
         height: var(--iori-stable-vh, 100svh);
         min-height: var(--iori-stable-vh, 100svh);
-        overflow-y: auto; /* 鍏佽绾靛悜婊氬姩 */
+        overflow-y: auto; /* Enable vertical scrolling in app container. */
         overflow-x: hidden;
-        -webkit-overflow-scrolling: touch; /* iOS 鍘熺敓鎯€ф粴鍔?*/
+        -webkit-overflow-scrolling: touch; /* Native momentum scrolling on iOS. */
         position: relative;
         z-index: 1;
       }
       body {
         background-color: transparent !important;
-        overflow: hidden; /* 绂佹 body 婊氬姩锛屼氦鐢?#app-scroll 绠＄悊 */
+        overflow: hidden; /* Disable body scroll; #app-scroll is the scroll owner. */
         min-height: var(--iori-stable-vh, 100svh);
         position: relative;
       }
       #fixed-background {
-        /* 浠呭蹇呰鐨勫睘鎬ц繘琛屽钩婊戣繃娓?*/
+        /* Keep transitions limited to required properties. */
         transition: background-color 0.3s ease, filter 0.3s ease;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
       }
-      /* 淇 iOS 涓?100vh 闂 (閽堝鑳屾櫙灞? */
+      /* Fix 100vh issues on iOS. */
       @supports (-webkit-touch-callout: none) {
         #app-scroll {
           height: var(--iori-stable-vh, 100svh);
@@ -1067,7 +1069,7 @@ export async function onRequest(context) {
 
   html = html.replace('</head>', `${globalScrollCss}</head>`);
   
-  // 鏇挎崲 body 鏍囩缁撴瀯锛屽鍔?#app-scroll 婊氬姩瀹瑰櫒
+  // Wrap body content with #app-scroll as the dedicated scroll container.
   html = html.replace('<body class="bg-secondary-50 font-sans text-gray-800">', `<body class="bg-secondary-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-100 relative layout-unified ${isCustomWallpaper ? 'custom-wallpaper' : ''}">${bgLayerHtml}<div id="app-scroll">`);
   
   // Close #app-scroll after </main> so fixed layers are not trapped in the scroll container.
@@ -1084,16 +1086,17 @@ export async function onRequest(context) {
   const cardCssVars = `<style>:root { --card-padding: 1.25rem; --card-radius: ${cardRadius}px; --card-scale: ${cardScale}; --frosted-glass-blur: ${frostedBlur}px; }</style>`;
   html = html.replace('</head>', `${cardCssVars}</head>`);
 
-  // 鑷姩娉ㄥ叆瀛椾綋璧勬簮
+  // Inject required font resources.
   // ... (existing code omitted for brevity but I should match context)
   const usedFonts = new Set();
   
-  // 鍙湁鍦ㄥ厓绱犳樉绀烘椂鎵嶆坊鍔犲搴旂殑瀛椾綋
+  // Only load fonts for visible homepage elements.
   if (!layoutHideTitle && homeTitleFont) usedFonts.add(homeTitleFont);
   if (!layoutHideSubtitle && homeSubtitleFont) usedFonts.add(homeSubtitleFont);
   if (!homeHideStats && homeStatsFont) usedFonts.add(homeStatsFont);
   
-  // 鍗＄墖瀛椾綋濮嬬粓娣诲姞锛屽洜涓哄畠浠槸鍗＄墖鐨勫熀鏈厓绱?  if (cardTitleFont) usedFonts.add(cardTitleFont);
+  // Card fonts are always considered because cards are always rendered.
+  if (cardTitleFont) usedFonts.add(cardTitleFont);
   if (cardDescFont) usedFonts.add(cardDescFont);
   
   let fontLinksHtml = '';
@@ -1104,7 +1107,7 @@ export async function onRequest(context) {
       }
   });
   
-  // 鍏煎鏃х増鑷畾涔?URL
+  // Backward compatibility for legacy custom font URL.
   const safeCustomFontUrl = sanitizeUrl(homeCustomFontUrl);
   if (safeCustomFontUrl) {
       fontLinksHtml += `<link rel="stylesheet" href="${safeCustomFontUrl}">`;
@@ -1209,7 +1212,7 @@ export async function onRequest(context) {
       response.headers.append('Set-Cookie', 'iori_cache_stale=; Path=/; Max-Age=0; SameSite=Lax');
   }
 
-  // 鍐欏叆缂撳瓨 (鍙涓嶆槸绠＄悊鍛樺己鍒跺埛鏂版垨 Stale 鐘舵€侊紝閮藉簲璇ュ啓鍏ョ紦瀛橈紝鍖呮嫭闅忔満澹佺焊寮€鍚殑鎯呭喌)
+  // Write homepage HTML cache when cache conditions are met.
   if (allowHomeCache) {
     const cacheKey = isAuthenticated ? cacheKeyPrivate : cacheKeyPublic;
     context.waitUntil(env.NAV_AUTH.put(cacheKey, html));
