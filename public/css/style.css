@@ -275,6 +275,57 @@ header {
 .custom-wallpaper .nav-btn.active { background-color: #2563eb; color: white; }
 .dark.custom-wallpaper .nav-btn.active { background-color: #2563eb !important; color: white !important; }
 
+/* Unified homepage layout: category chips always rendered under search (all breakpoints) */
+body.layout-unified #mobileOverlay,
+body.layout-unified #sidebar,
+body.layout-unified #sidebarToggle,
+body.layout-unified #closeSidebar,
+body.layout-unified #sidebar-toggle,
+body.layout-unified #horizontalMoreWrapper,
+body.layout-unified #horizontalMoreDropdown {
+  display: none !important;
+}
+
+body.layout-unified .main-content {
+  margin-left: 0 !important;
+}
+
+body.layout-unified #horizontalCategoryNav {
+  overflow: visible !important;
+  max-height: none !important;
+  row-gap: 0.65rem;
+  column-gap: 0.65rem;
+}
+
+body.layout-unified #horizontalCategoryNav .nav-btn {
+  margin: 0;
+}
+
+body.layout-unified #horizontalCategoryNav .catalog-chip[data-level="1"] {
+  padding-left: 1rem;
+}
+
+body.layout-unified #horizontalCategoryNav .catalog-chip[data-level="2"] {
+  padding-left: 1.2rem;
+}
+
+body.layout-unified #horizontalCategoryNav .catalog-chip[data-level="3"],
+body.layout-unified #horizontalCategoryNav .catalog-chip[data-level="4"] {
+  padding-left: 1.35rem;
+}
+
+@media (max-width: 640px) {
+  body.layout-unified #horizontalCategoryNav {
+    justify-content: flex-start !important;
+  }
+
+  body.layout-unified #horizontalCategoryNav .nav-btn {
+    font-size: 0.8125rem;
+    min-height: 2.25rem;
+    padding: 0.5rem 0.85rem;
+  }
+}
+
 /* 风格一图标动画 */
 .site-card:not(.style-2) .site-icon {
   width: 2.5rem; margin-right: 1rem; opacity: 1;

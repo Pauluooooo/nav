@@ -1,4 +1,4 @@
-const initSettings = () => {
+﻿const initSettings = () => {
   const settingsBtn = document.getElementById('settingsBtn');
   const settingsModal = document.getElementById('settingsModal');
   if (!settingsBtn || !settingsModal) return;
@@ -22,7 +22,6 @@ const initSettings = () => {
   const frostedGlassIntensityRange = document.getElementById('frostedGlassIntensity');
   const frostedGlassIntensityValue = document.getElementById('frostedGlassIntensityValue');
   const gridColsRadios = document.getElementsByName('gridCols');
-  const menuLayoutRadios = document.getElementsByName('menuLayout');
   const customWallpaperInput = document.getElementById('customWallpaperInput');
   const randomWallpaperSwitch = document.getElementById('randomWallpaperSwitch');
   const bgBlurSwitch = document.getElementById('bgBlurSwitch');
@@ -90,19 +89,19 @@ const initSettings = () => {
 
   // Font Options
   const FONT_OPTIONS = [
-      { value: "", label: "默认字体" },
-      { value: "sans-serif", label: "Sans Serif (通用无衬线)" },
-      { value: "serif", label: "Serif (通用衬线)" },
-      { value: "monospace", label: "Monospace (通用等宽)" },
-      { value: "'Microsoft YaHei', sans-serif", label: "微软雅黑 (Windows)" },
-      { value: "'SimSun', serif", label: "宋体 (Windows)" },
-      { value: "'PingFang SC', sans-serif", label: "苹方 (Mac)" },
+      { value: "", label: "榛樿瀛椾綋" },
+      { value: "sans-serif", label: "Sans Serif (閫氱敤鏃犺‖绾?" },
+      { value: "serif", label: "Serif (閫氱敤琛嚎)" },
+      { value: "monospace", label: "Monospace (閫氱敤绛夊)" },
+      { value: "'Microsoft YaHei', sans-serif", label: "寰蒋闆呴粦 (Windows)" },
+      { value: "'SimSun', serif", label: "瀹嬩綋 (Windows)" },
+      { value: "'PingFang SC', sans-serif", label: "鑻规柟 (Mac)" },
       { value: "'Segoe UI', sans-serif", label: "Segoe UI (Windows)" },
       { value: "'Noto Sans SC', sans-serif", label: "Noto Sans SC (Web)" },
       { value: "'Noto Serif SC', serif", label: "Noto Serif SC (Web)" },
-      { value: "'Ma Shan Zheng', cursive", label: "马善政毛笔 (Web)" },
-      { value: "'ZCOOL KuaiLe', cursive", label: "站酷快乐体 (Web)" },
-      { value: "'Long Cang', cursive", label: "龙苍草书 (Web)" },
+      { value: "'Ma Shan Zheng', cursive", label: "椹杽鏀挎瘺绗?(Web)" },
+      { value: "'ZCOOL KuaiLe', cursive", label: "绔欓叿蹇箰浣?(Web)" },
+      { value: "'Long Cang', cursive", label: "榫欒媿鑽変功 (Web)" },
       { value: "'Roboto', sans-serif", label: "Roboto (Web)" },
       { value: "'Open Sans', sans-serif", label: "Open Sans (Web)" },
       { value: "'Lato', sans-serif", label: "Lato (Web)" },
@@ -348,13 +347,10 @@ const initSettings = () => {
     home_theme_mode: 'auto',
     home_theme_auto_dark_start: '19',
     home_theme_auto_dark_end: '7',
-    home_default_category: '',
-    home_remember_last_category: false,
     layout_enable_frosted_glass: false,
     layout_frosted_glass_intensity: '15',
     layout_grid_cols: '4',
     layout_custom_wallpaper: '',
-    layout_menu_layout: 'horizontal',
     layout_random_wallpaper: false,
     layout_enable_bg_blur: false,
     layout_bg_blur_intensity: '0',
@@ -516,7 +512,7 @@ const initSettings = () => {
         <img src="${thumb}" class="wp-card-image" alt="${title}">
       </div>
       <div class="wp-card-overlay">
-        <span class="wp-card-btn">应用</span>
+        <span class="wp-card-btn">搴旂敤</span>
       </div>`;
     
     div.addEventListener('click', () => {
@@ -532,7 +528,7 @@ const initSettings = () => {
   // Fetch Bing Wallpapers
   async function fetchBingWallpapers(country = '') {
       if (!onlineWallpapersDiv) return;
-      onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">加载中...</div>';
+      onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">鍔犺浇涓?..</div>';
       
       try {
           let url = '';
@@ -549,7 +545,7 @@ const initSettings = () => {
           onlineWallpapersDiv.innerHTML = '';
           
           if (!Array.isArray(data) || data.length === 0) {
-              onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">未获取到壁纸</div>';
+              onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">鏈幏鍙栧埌澹佺焊</div>';
               return;
           }
           
@@ -562,7 +558,7 @@ const initSettings = () => {
           
       } catch (err) {
           console.error('Bing Wallpaper Fetch Error:', err);
-          onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-red-400 py-8 text-sm">加载失败，请检查网络或稍后重试</div>';
+          onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-red-400 py-8 text-sm">鍔犺浇澶辫触锛岃妫€鏌ョ綉缁滄垨绋嶅悗閲嶈瘯</div>';
       }
   }
 
@@ -596,7 +592,7 @@ const initSettings = () => {
   // Fetch 360 Wallpapers
   async function fetch360Wallpapers(cid = '36') {
       if (!onlineWallpapersDiv) return;
-      onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">加载中...</div>';
+      onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">鍔犺浇涓?..</div>';
       
       try {
           const res = await fetch(`/api/wallpaper?source=360&action=list&cid=${cid}&start=0&count=8`);
@@ -607,7 +603,7 @@ const initSettings = () => {
           const apiData = result.data;
           
           if (result.code !== 200 || !apiData || !apiData.data || apiData.data.length === 0) {
-               onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">未获取到壁纸</div>';
+               onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">鏈幏鍙栧埌澹佺焊</div>';
                return;
           }
           
@@ -627,7 +623,7 @@ const initSettings = () => {
           
       } catch (err) {
           console.error('360 Wallpaper Error:', err);
-          onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-red-400 py-8 text-sm">加载失败</div>';
+          onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-red-400 py-8 text-sm">鍔犺浇澶辫触</div>';
       }
   }
 
@@ -663,7 +659,7 @@ const initSettings = () => {
           if(category360Select) category360Select.classList.remove('hidden');
           
           if (onlineWallpapersDiv) {
-              onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">加载中...</div>';
+              onlineWallpapersDiv.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8 text-sm">鍔犺浇涓?..</div>';
           }
           
           fetch360Categories().then(() => {
@@ -685,7 +681,7 @@ const initSettings = () => {
 
   const closeModal = () => {
     if (bulkProgressView.style.display !== 'none') {
-      if (!confirm('批量生成正在进行中，确定要关闭吗？')) {
+      if (!confirm('Bulk generation is running. Close anyway?')) {
         return;
       }
       shouldStopBulkGeneration = true;
@@ -717,7 +713,7 @@ const initSettings = () => {
         });
         
         // Auto fetch wallpapers if tab is active and empty
-        if (tabId === 'wallpaper-settings' && onlineWallpapersDiv && (!onlineWallpapersDiv.children.length || onlineWallpapersDiv.innerText.includes('加载中'))) {
+        if (tabId === 'wallpaper-settings' && onlineWallpapersDiv && (!onlineWallpapersDiv.children.length || onlineWallpapersDiv.innerText.includes('Loading...'))) {
             switchWallpaperSource(currentSettings.wallpaper_source || 'bing');
         }
     });
@@ -792,14 +788,6 @@ const initSettings = () => {
       currentSettings.home_site_name = homeSiteNameInput?.value?.trim() ?? currentSettings.home_site_name;
       currentSettings.home_site_description = homeSiteDescriptionInput?.value?.trim() ?? currentSettings.home_site_description;
 
-      if (homeDefaultCategorySelect) {
-          currentSettings.home_default_category = homeDefaultCategorySelect.value;
-      }
-
-      if (homeRememberLastCategorySwitch) {
-          currentSettings.home_remember_last_category = homeRememberLastCategorySwitch.checked;
-      }
-
       const rawSearchProvider = (searchEngineProviderSelect?.value || 'local').toLowerCase();
       const normalizedSearchProvider = ['local', 'google', 'baidu', 'bing'].includes(rawSearchProvider)
         ? rawSearchProvider
@@ -827,14 +815,6 @@ const initSettings = () => {
           }
       }
 
-      // Menu Layout
-      for (const radio of menuLayoutRadios) {
-          if (radio.checked) {
-              currentSettings.layout_menu_layout = radio.value;
-              break;
-          }
-      }
-
       currentSettings.layout_enable_frosted_glass = frostedGlassSwitch?.checked ?? currentSettings.layout_enable_frosted_glass;
       currentSettings.layout_frosted_glass_intensity = frostedGlassIntensityRange?.value ?? currentSettings.layout_frosted_glass_intensity;
 
@@ -852,7 +832,7 @@ const initSettings = () => {
       saveSettings();
     } catch (e) {
       console.error('Save handler error:', e);
-      showMessage('保存失败: ' + e.message, 'error');
+      showMessage('淇濆瓨澶辫触: ' + e.message, 'error');
     }
   });
 
@@ -897,45 +877,13 @@ const initSettings = () => {
   batchCompleteBtn.addEventListener('click', handleBulkGenerate);
   stopBulkBtn.addEventListener('click', () => {
     shouldStopBulkGeneration = true;
-    showMessage('正在停止...', 'info');
+    showMessage('姝ｅ湪鍋滄...', 'info');
   });
 
   // --- Helper Functions ---
 
-  const homeDefaultCategorySelect = document.getElementById('homeDefaultCategory');
-  const homeRememberLastCategorySwitch = document.getElementById('homeRememberLastCategorySwitch');
 
   async function loadSettings() {
-    // Ensure categories are loaded for the dropdown
-    if (categoriesTree.length === 0) {
-        try {
-            const res = await fetch('/api/categories?pageSize=9999');
-            const data = await res.json();
-            if (data.code === 200) {
-                categoriesData = data.data || [];
-                categoriesTree = buildCategoryTree(categoriesData);
-            }
-        } catch (e) { console.error('Failed to load categories for settings', e); }
-    }
-
-    if (homeDefaultCategorySelect) {
-        homeDefaultCategorySelect.innerHTML = '<option value="">默认 (全部)</option>';
-        
-        // Helper to flatten tree for simple select
-        const addOptions = (nodes, prefix = '') => {
-            nodes.forEach(node => {
-                const option = document.createElement('option');
-                option.value = node.catelog; // Store Name as value, because config uses name
-                option.textContent = prefix + node.catelog;
-                homeDefaultCategorySelect.appendChild(option);
-                if (node.children && node.children.length > 0) {
-                    addOptions(node.children, prefix + '-- ');
-                }
-            });
-        };
-        addOptions(categoriesTree);
-    }
-
     try {
         // 1. Try to fetch from server (new source of truth)
         const res = await fetch('/api/settings');
@@ -993,14 +941,10 @@ const initSettings = () => {
             if (serverSettings.home_theme_auto_dark_start !== undefined) currentSettings.home_theme_auto_dark_start = normalizeThemeHour(serverSettings.home_theme_auto_dark_start, 19);
             if (serverSettings.home_theme_auto_dark_end !== undefined) currentSettings.home_theme_auto_dark_end = normalizeThemeHour(serverSettings.home_theme_auto_dark_end, 7);
             
-            if (serverSettings.home_default_category) currentSettings.home_default_category = serverSettings.home_default_category;
-            if (serverSettings.home_remember_last_category !== undefined) currentSettings.home_remember_last_category = serverSettings.home_remember_last_category === 'true';
-
             if (serverSettings.layout_enable_frosted_glass !== undefined) currentSettings.layout_enable_frosted_glass = serverSettings.layout_enable_frosted_glass === 'true';
             if (serverSettings.layout_frosted_glass_intensity) currentSettings.layout_frosted_glass_intensity = serverSettings.layout_frosted_glass_intensity;
             if (serverSettings.layout_grid_cols) currentSettings.layout_grid_cols = serverSettings.layout_grid_cols;
             if (serverSettings.layout_custom_wallpaper) currentSettings.layout_custom_wallpaper = serverSettings.layout_custom_wallpaper;
-            if (serverSettings.layout_menu_layout) currentSettings.layout_menu_layout = serverSettings.layout_menu_layout;
             if (serverSettings.layout_random_wallpaper !== undefined) currentSettings.layout_random_wallpaper = serverSettings.layout_random_wallpaper === 'true';
             if (serverSettings.layout_enable_bg_blur !== undefined) currentSettings.layout_enable_bg_blur = serverSettings.layout_enable_bg_blur === 'true';
             if (serverSettings.layout_bg_blur_intensity) currentSettings.layout_bg_blur_intensity = serverSettings.layout_bg_blur_intensity;
@@ -1040,7 +984,7 @@ const initSettings = () => {
     // Save to Server
     try {
         saveBtn.disabled = true;
-        saveBtn.innerHTML = '<span>⏳</span> 保存中...';
+        saveBtn.innerHTML = '<span>鈴?/span> 淇濆瓨涓?..';
         
         const res = await fetch('/api/settings', {
             method: 'POST',
@@ -1050,17 +994,17 @@ const initSettings = () => {
         const data = await res.json();
         
         if (data.code === 200) {
-            showMessage('设置已保存', 'success');
+            showMessage('Settings saved.', 'success');
             closeModal();
         } else {
-            showMessage('保存失败: ' + data.message, 'error');
+            showMessage('淇濆瓨澶辫触: ' + data.message, 'error');
         }
     } catch (e) {
-        showMessage('保存失败 (网络错误)', 'error');
+        showMessage('淇濆瓨澶辫触 (缃戠粶閿欒)', 'error');
         console.error(e);
     } finally {
         saveBtn.disabled = false;
-        saveBtn.innerHTML = '<span>💾</span> 保存设置';
+        saveBtn.innerHTML = '<span>馃捑</span> 淇濆瓨璁剧疆';
     }
   }
 
@@ -1074,9 +1018,9 @@ const initSettings = () => {
     // API Key UI Logic
     apiKeyInput.value = currentSettings.apiKey || '';
     if (currentSettings.has_api_key && !apiKeyInput.value) {
-        apiKeyInput.placeholder = '已配置 (如需修改请直接输入)';
+        apiKeyInput.placeholder = '宸查厤缃?(濡傞渶淇敼璇风洿鎺ヨ緭鍏?';
     } else {
-        apiKeyInput.placeholder = '请输入 API Key';
+        apiKeyInput.placeholder = '璇疯緭鍏?API Key';
     }
 
     baseUrlInput.value = currentSettings.baseUrl || '';
@@ -1150,9 +1094,6 @@ const initSettings = () => {
     if (homeSiteNameInput) homeSiteNameInput.value = currentSettings.home_site_name || '';
     if (homeSiteDescriptionInput) homeSiteDescriptionInput.value = currentSettings.home_site_description || '';
     
-    if (homeDefaultCategorySelect) homeDefaultCategorySelect.value = currentSettings.home_default_category || '';
-    if (homeRememberLastCategorySwitch) homeRememberLastCategorySwitch.checked = !!currentSettings.home_remember_last_category;
-
     if (searchEngineProviderSelect) {
         const provider = String(currentSettings.home_search_engine_provider || '').toLowerCase();
         searchEngineProviderSelect.value = ['local', 'google', 'baidu', 'bing'].includes(provider) ? provider : 'local';
@@ -1196,15 +1137,6 @@ const initSettings = () => {
     if (gridColsRadios) {
         for (const radio of gridColsRadios) {
             if (radio.value === String(currentSettings.layout_grid_cols)) {
-                radio.checked = true;
-            }
-        }
-    }
-    
-    // Menu Layout
-    if (menuLayoutRadios) {
-        for (const radio of menuLayoutRadios) {
-            if (radio.value === String(currentSettings.layout_menu_layout)) {
                 radio.checked = true;
             }
         }
@@ -1262,14 +1194,14 @@ const initSettings = () => {
     let systemPrompt, userPrompt;
     if (generateName) {
       systemPrompt = "You are a helpful assistant. You must response with valid JSON.";
-      userPrompt = `分析链接：'${url}'。请生成一个简短的网站名称（name，不超过10字）和中文简介（description，不超过30字）。请严格只返回 JSON 格式，例如：{"name": "名称", "description": "简介"}。`;
+      userPrompt = `Analyze this URL: ${url}. Generate a short website name (name, <=10 chars) and a Chinese summary (description, <=30 chars). Return JSON only, for example: {"name":"Example","description":"Summary"}.`;
     } else {
       systemPrompt = "You are a helpful assistant that generates concise and accurate descriptions for bookmarks.";
-      userPrompt = `为以下书签生成一个简洁的中文描述（不超过30字）。请直接返回描述内容，不要包含"书签名称"、"描述"等前缀，也不要使用"标题: 描述"的格式。书签名称：'${name}'，链接：'${url}'`;
+      userPrompt = `涓轰互涓嬩功绛剧敓鎴愪竴涓畝娲佺殑涓枃鎻忚堪锛堜笉瓒呰繃30瀛楋級銆傝鐩存帴杩斿洖鎻忚堪鍐呭锛屼笉瑕佸寘鍚?涔︾鍚嶇О"銆?鎻忚堪"绛夊墠缂€锛屼篃涓嶈浣跨敤"鏍囬: 鎻忚堪"鐨勬牸寮忋€備功绛惧悕绉帮細'${name}'锛岄摼鎺ワ細'${url}'`;
     }
 
     try {
-      // 始终通过后端 API 进行请求，后端会处理不同的 provider (Workers AI, Gemini, OpenAI)
+      // 濮嬬粓閫氳繃鍚庣 API 杩涜璇锋眰锛屽悗绔細澶勭悊涓嶅悓鐨?provider (Workers AI, Gemini, OpenAI)
       const response = await fetch('/api/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1283,7 +1215,7 @@ const initSettings = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `AI 请求失败: ${response.status}`);
+        throw new Error(errorData.message || `AI 璇锋眰澶辫触: ${response.status}`);
       }
 
       const data = await response.json();
@@ -1294,7 +1226,7 @@ const initSettings = () => {
           const jsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
           return JSON.parse(jsonStr);
         } catch (e) {
-          console.warn('JSON 解析失败，将原始文本作为描述返回', e);
+          console.warn('JSON 瑙ｆ瀽澶辫触锛屽皢鍘熷鏂囨湰浣滀负鎻忚堪杩斿洖', e);
           return { description: responseText, name: '' };
         }
       } else {
@@ -1302,7 +1234,7 @@ const initSettings = () => {
       }
 
     } catch (error) {
-      console.error('AI 描述生成失败:', error);
+      console.error('AI 鎻忚堪鐢熸垚澶辫触:', error);
       throw error;
     }
   }
@@ -1316,33 +1248,33 @@ const initSettings = () => {
     // Validation - Backend will validate API Key
     if (currentSettings.provider !== 'workers-ai') {
       if (currentSettings.provider === 'openai' && !currentSettings.baseUrl) {
-        showMessage('使用 OpenAI 兼容模式时，Base URL 是必填项', 'error');
+        showMessage('浣跨敤 OpenAI 鍏煎妯″紡鏃讹紝Base URL 鏄繀濉」', 'error');
         return;
       }
     }
 
-    showMessage('正在扫描所有书签，请稍候...', 'info');
+    showMessage('姝ｅ湪鎵弿鎵€鏈変功绛撅紝璇风◢鍊?..', 'info');
     let linksToUpdate = [];
     try {
       const response = await fetch('/api/get-empty-desc-sites');
       const result = await response.json();
 
       if (!response.ok || result.code !== 200) {
-        showMessage(result.message || '获取待处理列表失败', 'error');
+        showMessage(result.message || 'Failed to fetch pending bookmarks.', 'error');
         return;
       }
       linksToUpdate = result.data;
     } catch (error) {
-      showMessage('扫描书签时发生网络错误', 'error');
+      showMessage('Network error while scanning bookmarks.', 'error');
       return;
     }
 
     if (linksToUpdate.length === 0) {
-      showMessage('太棒了！所有书签都已有描述。', 'success');
+      showMessage('All bookmarks already have descriptions.', 'success');
       return;
     }
 
-    if (!confirm(`发现 ${linksToUpdate.length} 个链接缺少描述，确定要使用 AI 自动生成吗？`)) {
+    if (!confirm(`Found ${linksToUpdate.length} bookmarks without descriptions. Generate with AI now?`)) {
       return;
     }
 
@@ -1392,29 +1324,29 @@ const initSettings = () => {
     bulkIdleView.style.display = 'block';
     bulkProgressView.style.display = 'none';
 
-    // 如果是手动停止，等待2秒以确保数据库写入最终一致性
+    // 濡傛灉鏄墜鍔ㄥ仠姝紝绛夊緟2绉掍互纭繚鏁版嵁搴撳啓鍏ユ渶缁堜竴鑷存€?
     if (shouldStopBulkGeneration) {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
-    // 如果有任何书签被更新（或操作被停止），则刷新列表
+    // 濡傛灉鏈変换浣曚功绛捐鏇存柊锛堟垨鎿嶄綔琚仠姝級锛屽垯鍒锋柊鍒楄〃
     if (completedCount > 0 || shouldStopBulkGeneration) {
       fetchConfigs(currentPage);
     }
 
-    // 根据结果显示最终消息
+    // 鏍规嵁缁撴灉鏄剧ず鏈€缁堟秷鎭?
     let message = '';
     let messageType = 'success';
     if (shouldStopBulkGeneration) {
-      message = `操作已停止。成功更新 ${completedCount} 个书签。列表已刷新。`;
+      message = `Operation stopped. Updated ${completedCount} bookmarks.`;
     } else {
       if (completedCount === total && total > 0) {
-        message = `批量生成完成！成功更新了全部 ${total} 个书签。`;
+        message = `Bulk generation complete. Updated all ${total} bookmarks.`;
       } else if (completedCount > 0) {
-        message = `批量生成完成。成功更新 ${completedCount} / ${total} 个书签。`;
+        message = `Bulk generation complete. Updated ${completedCount} / ${total} bookmarks.`;
         messageType = 'info';
       } else if (total > 0) {
-        message = '批量生成完成，但未能成功更新任何书签。请检查控制台日志。';
+        message = 'Bulk generation complete, but no bookmarks were updated. Check console logs.';
         messageType = 'error';
       }
     }
@@ -1436,7 +1368,7 @@ const initSettings = () => {
     const btn = document.getElementById(btnId);
 
     if (!url) {
-      showMessage('请先填写 URL', 'error');
+      showMessage('璇峰厛濉啓 URL', 'error');
       return;
     }
 
@@ -1445,21 +1377,21 @@ const initSettings = () => {
     btn.innerHTML = '<div class="ai-spinner"></div>';
     btn.disabled = true;
 
-    showMessage('正在生成描述...', 'info');
+    showMessage('姝ｅ湪鐢熸垚鎻忚堪...', 'info');
     try {
       // Create a temporary object to match the expected structure
       const generateName = !name;
-      const bookmark = { name: name || '未命名', url: url };
+      const bookmark = { name: name || 'Untitled', url: url };
       const result = await getAIDescription(currentSettings, bookmark, generateName);
 
       descInput.value = result.description;
       if (generateName && result.name) {
         document.getElementById(nameInputId).value = result.name;
       }
-      showMessage('生成成功', 'success');
+      showMessage('鐢熸垚鎴愬姛', 'success');
     } catch (error) {
       console.error(error);
-      showMessage('生成失败: ' + error.message, 'error');
+      showMessage('鐢熸垚澶辫触: ' + error.message, 'error');
     } finally {
       // Restore State
       btn.innerHTML = originalContent;

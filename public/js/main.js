@@ -1,14 +1,10 @@
-document.addEventListener('DOMContentLoaded', function() {
-  // 禁用浏览器自动滚动恢复，确保刷新后始终从顶部开始
+﻿document.addEventListener('DOMContentLoaded', function() {
+  // 绂佺敤娴忚鍣ㄨ嚜鍔ㄦ粴鍔ㄦ仮澶嶏紝纭繚鍒锋柊鍚庡缁堜粠椤堕儴寮€濮?
   if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual';
   }
 
-  // ========== 侧边栏控制 ==========
-  const sidebar = document.getElementById('sidebar');
-  const mobileOverlay = document.getElementById('mobileOverlay');
-  const sidebarToggle = document.getElementById('sidebarToggle');
-  const closeSidebar = document.getElementById('closeSidebar');
+  // ========== 渚ц竟鏍忔帶鍒?==========
   const appScroll = document.getElementById('app-scroll');
   const scrollContainer = appScroll || window;
 
@@ -120,21 +116,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   setupViewportStability();
   
-  function openSidebar() {
-    sidebar?.classList.add('open');
-    mobileOverlay?.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-  
   function closeSidebarMenu() {
-    sidebar?.classList.remove('open');
-    mobileOverlay?.classList.remove('open');
-    document.body.style.overflow = '';
+    // Unified layout no longer uses mobile sidebar navigation.
   }
-  
-  sidebarToggle?.addEventListener('click', openSidebar);
-  closeSidebar?.addEventListener('click', closeSidebarMenu);
-  mobileOverlay?.addEventListener('click', closeSidebarMenu);
   
   // Clean up initial server-side rendered cards animation
   const initialCards = document.querySelectorAll('.site-card.card-anim-enter');
@@ -148,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }, { once: true });
   });
   
-  // ========== 复制链接功能 ==========
+  // ========== 澶嶅埗閾炬帴鍔熻兘 ==========
   document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', function(e) {
       e.preventDefault();
@@ -159,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
       navigator.clipboard.writeText(url).then(() => {
         showCopySuccess(this);
       }).catch(() => {
-        // 备用方法
+        // 澶囩敤鏂规硶
         const textarea = document.createElement('textarea');
         textarea.value = url;
         textarea.style.position = 'fixed';
@@ -169,7 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
           document.execCommand('copy');
           showCopySuccess(this);
         } catch (e) {
-          alert('复制失败,请手动复制');
+          alert('Copy failed. Please copy manually.');
         }
         document.body.removeChild(textarea);
       });
@@ -186,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2000);
   }
   
-  // ========== 返回顶部 ==========
+  // ========== 杩斿洖椤堕儴 ==========
   const backToTop = document.getElementById('backToTop');
 
   function setBackToTopVisibility(visible) {
@@ -239,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   setupBackToTopController();
   
-  // ========== 模态框控制 ==========
+  // ========== 妯℃€佹鎺у埗 ==========
   const addSiteModal = document.getElementById('addSiteModal');
   const addSiteBtnSidebar = document.getElementById('addSiteBtnSidebar');
   const closeModalBtn = document.getElementById('closeModal');
@@ -266,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const response = await fetch('/api/categories?pageSize=999');
       const data = await response.json();
       if (data.code === 200 && data.data) {
-        selectElement.innerHTML = '<option value="" disabled selected>请选择一个分类</option>';
+        selectElement.innerHTML = '<option value="" disabled selected>璇烽€夋嫨涓€涓垎绫?/option>';
         data.data.forEach(category => {
           const option = document.createElement('option');
           option.value = category.id;
@@ -274,11 +258,11 @@ document.addEventListener('DOMContentLoaded', function() {
           selectElement.appendChild(option);
         });
       } else {
-        selectElement.innerHTML = '<option value="" disabled>无法加载分类</option>';
+        selectElement.innerHTML = '<option value="" disabled>鏃犳硶鍔犺浇鍒嗙被</option>';
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error);
-      selectElement.innerHTML = '<option value="" disabled>加载分类失败</option>';
+      selectElement.innerHTML = '<option value="" disabled>鍔犺浇鍒嗙被澶辫触</option>';
     }
   }
 
@@ -294,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.target === addSiteModal) closeModal();
   });
   
-  // ========== 表单提交 ==========
+  // ========== 琛ㄥ崟鎻愪氦 ==========
   addSiteForm?.addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -314,16 +298,16 @@ document.addEventListener('DOMContentLoaded', function() {
     .then(res => res.json())
     .then(data => {
       if (data.code === 201) {
-        showToast('提交成功,等待管理员审核');
+        showToast('Submitted successfully. Pending admin review.');
         closeModal();
         addSiteForm.reset();
       } else {
-        alert(data.message || '提交失败');
+        alert(data.message || '鎻愪氦澶辫触');
       }
     })
     .catch(err => {
-      console.error('网络错误:', err);
-      alert('网络错误,请稍后重试');
+      console.error('缃戠粶閿欒:', err);
+      alert('Network error. Please try again later.');
     });
   });
   
@@ -339,7 +323,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2500);
   }
   
-  // ========== 搜索功能 ==========
+  // ========== 鎼滅储鍔熻兘 ==========
   const searchInputs = document.querySelectorAll('.search-input-target');
   const sitesGrid = document.getElementById('sitesGrid');
   
@@ -349,10 +333,10 @@ document.addEventListener('DOMContentLoaded', function() {
   window.currentSearchEngine = currentSearchEngine;
 
   const searchPlaceholderMap = {
-      local: '搜索书签...',
-      google: 'Google 搜索...',
-      baidu: '百度搜索...',
-      bing: 'Bing 搜索...'
+      local: '鎼滅储涔︾...',
+      google: 'Google 鎼滅储...',
+      baidu: '鐧惧害鎼滅储...',
+      bing: 'Bing 鎼滅储...'
   };
   let currentSearchKeyword = '';
   const searchPlaceholder = searchPlaceholderMap[currentSearchEngine] || searchPlaceholderMap.local;
@@ -453,28 +437,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     if (keyword) {
-      heading.textContent = isMobile ? `${visibleCount} 个书签` : `搜索结果 · ${visibleCount} 个书签`;
+      heading.textContent = isMobile
+        ? `${visibleCount} results`
+        : `Search results · ${visibleCount} bookmarks`;
     } else {
       const currentActive = heading.dataset.active;
       if (isMobile) {
-          heading.textContent = `${visibleCount} 个书签`;
+        heading.textContent = `${visibleCount} bookmarks`;
+      } else if (currentActive) {
+        heading.textContent = `${currentActive} · ${visibleCount} bookmarks`;
       } else {
-          if (currentActive) {
-              heading.textContent = `${currentActive} · ${visibleCount} 个书签`;
-          } else {
-              heading.textContent = `全部收藏 · ${visibleCount} 个书签`;
-          }
+        heading.textContent = `All bookmarks · ${visibleCount} bookmarks`;
       }
     }
   }
 
-  // 初次加载时根据屏幕宽度修正标题显示
+  // 鍒濇鍔犺浇鏃舵牴鎹睆骞曞搴︿慨姝ｆ爣棰樻樉绀?
   updateHeading();
   groupRenderedCards();
 
-  // ========== 一言 API ==========
+  // ========== 涓€瑷€ API ==========
   const hitokotoContainer = document.querySelector('#hitokoto')?.parentElement;
-  // 检查容器是否被隐藏，如果隐藏则不发起请求
+  // 妫€鏌ュ鍣ㄦ槸鍚﹁闅愯棌锛屽鏋滈殣钘忓垯涓嶅彂璧疯姹?
   if (hitokotoContainer && !hitokotoContainer.classList.contains('hidden')) {
     console.log('[Debug] Fetching hitokoto...');
     fetch('https://v1.hitokoto.cn')
@@ -489,148 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
       .catch(console.error);
   }
 
-  // ========== Horizontal Menu Overflow Logic ==========
-  const navContainer = document.getElementById('horizontalCategoryNav');
-  const moreWrapper = document.getElementById('horizontalMoreWrapper');
-  const moreBtn = document.getElementById('horizontalMoreBtn');
-  const dropdown = document.getElementById('horizontalMoreDropdown');
-  
-  // Define these globally within the scope so updateNavigationState can use them
-  let checkOverflow = () => {};
-  let resetNav = () => {};
-
-  if (navContainer && moreWrapper && moreBtn && dropdown) {
-    resetNav = () => {
-        const dropdownItems = Array.from(dropdown.children);
-        dropdownItems.forEach(item => {
-            if (item.dataset.originalClass) item.className = item.dataset.originalClass;
-            const link = item.querySelector('a');
-            if (link && link.dataset.originalClass) link.className = link.dataset.originalClass;
-            navContainer.insertBefore(item, moreWrapper);
-        });
-        moreWrapper.classList.add('hidden');
-        moreBtn.classList.remove('active', 'text-primary-600', 'bg-secondary-100');
-        moreBtn.classList.add('inactive');
-    };
-
-    checkOverflow = () => {
-        resetNav();
-        
-        // Filter visible category items (exclude moreWrapper which is hidden now)
-        // Actually moreWrapper is child of navContainer.
-        const navChildren = Array.from(navContainer.children).filter(el => el !== moreWrapper);
-        
-        if (navChildren.length === 0) return;
-        
-        const firstTop = navChildren[0].offsetTop;
-        const lastItem = navChildren[navChildren.length - 1];
-        
-        // Check if last item wraps
-        if (lastItem.offsetTop === firstTop) {
-            // No wrapping even for the last item -> All fit!
-            navContainer.style.overflow = 'visible';
-            return;
-        }
-        
-        // Wrapping detected! Show the "More" button to participate in layout
-        moreWrapper.classList.remove('hidden');
-        
-        // Loop to move items to dropdown until everything fits on one line
-        // We check if "moreWrapper" (which is now the last item) wraps.
-        // Or if the item before it wraps.
-        while (true) {
-             // Current visible items (categories)
-             const currentCategories = Array.from(navContainer.children).filter(el => el !== moreWrapper && el.style.display !== 'none');
-             
-             if (currentCategories.length === 0) break; // Should not happen
-             
-             const lastCategory = currentCategories[currentCategories.length - 1];
-             
-             // Check condition: Does "moreWrapper" wrap? Or does "lastCategory" wrap?
-             // (We want everything on the first line)
-             const moreWrapperWraps = moreWrapper.offsetTop > firstTop;
-             const lastCategoryWraps = lastCategory.offsetTop > firstTop;
-             
-             if (!moreWrapperWraps && !lastCategoryWraps) {
-                 // Fits!
-                 break;
-             }
-             
-             // Doesn't fit. Move lastCategory to dropdown.
-             // Prepend to maintain order (4, 5 -> [5] -> [4, 5])
-             
-             // Save wrapper class
-             if (!lastCategory.dataset.originalClass) {
-                 lastCategory.dataset.originalClass = lastCategory.className;
-             }
-            
-             // Wrapper becomes a block item in dropdown
-             lastCategory.className = 'menu-item-wrapper block w-full relative';
-            
-             // Adjust inner link style
-             const link = lastCategory.querySelector('a');
-             if (link) {
-                 link.dataset.originalClass = link.className;
-                 const isActive = link.classList.contains('active');
-                 link.className = 'dropdown-item w-full text-left px-4 py-2 text-sm';
-                 if (isActive) link.classList.add('active');
-             }
-             
-             dropdown.insertBefore(lastCategory, dropdown.firstChild);
-        }
-
-        // Check if any item in dropdown is active and highlight More button
-        const activeInDropdown = dropdown.querySelector('.active');
-        if (activeInDropdown) {
-             moreBtn.classList.add('active');
-             moreBtn.classList.remove('inactive');
-             moreBtn.classList.add('text-primary-600', 'bg-secondary-100');
-        }
-
-        // Restore overflow to visible to allow dropdowns (submenus) to show
-        navContainer.style.overflow = 'visible';
-    };
-
-    // Initial check
-    setTimeout(checkOverflow, 100);
-    window.addEventListener('resize', () => {
-        // Debounce
-        clearTimeout(window.resizeTimer);
-        window.resizeTimer = setTimeout(checkOverflow, 100);
-    });
-
-    // Toggle Dropdown
-    moreBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isHidden = dropdown.classList.contains('hidden');
-        if (isHidden) {
-            dropdown.classList.remove('hidden');
-            document.body.classList.add('menu-open');
-        } else {
-            dropdown.classList.add('hidden');
-            document.body.classList.remove('menu-open');
-        }
-    });
-
-    // Close on click inside dropdown
-    dropdown.addEventListener('click', (e) => {
-        const link = e.target.closest('a');
-        if (link) {
-            dropdown.classList.add('hidden');
-            document.body.classList.remove('menu-open');
-        }
-    });
-
-    // Close on click outside
-    document.addEventListener('click', (e) => {
-        if (!dropdown.contains(e.target) && !moreBtn.contains(e.target)) {
-            dropdown.classList.add('hidden');
-            document.body.classList.remove('menu-open');
-        }
-    });
-  }
-
-  // 已禁用页面初次根据 URL 定位分类的自动跳转，以确保每次刷新都显示全部分类
+  // 宸茬鐢ㄩ〉闈㈠垵娆℃牴鎹?URL 瀹氫綅鍒嗙被鐨勮嚜鍔ㄨ烦杞紝浠ョ‘淇濇瘡娆″埛鏂伴兘鏄剧ず鍏ㄩ儴鍒嗙被
   (function initialCatalogScroll() {
       // Intentionally left blank.
   })();
@@ -755,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function getCategoryOrderMap() {
       const orderMap = new Map();
       let order = 0;
-      document.querySelectorAll('#horizontalCategoryNav a[data-id], #sidebar a[data-id]').forEach(link => {
+      document.querySelectorAll('#horizontalCategoryNav a[data-id]').forEach(link => {
           const id = String(link.getAttribute('data-id') || '').trim();
           if (!id || orderMap.has(id)) return;
           orderMap.set(id, order++);
@@ -766,10 +609,12 @@ document.addEventListener('DOMContentLoaded', function() {
   function findCatalogIdByName(name) {
       const normalizedName = String(name || '').trim();
       if (!normalizedName) return '';
-      const links = document.querySelectorAll('#horizontalCategoryNav a[data-id], #sidebar a[data-id], a[data-id]');
+      const links = document.querySelectorAll('#horizontalCategoryNav a[data-id]');
       for (const link of links) {
+          const titleName = String(link.getAttribute('title') || '').trim();
           const text = String(link.textContent || '').replace(/\s+/g, ' ').trim();
-          if (text === normalizedName) {
+          const plainText = text.replace(/^[·\s]+/, '').trim();
+          if (titleName === normalizedName || text === normalizedName || plainText === normalizedName) {
               return String(link.getAttribute('data-id') || '');
           }
       }
@@ -1009,7 +854,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       const grouped = new Map();
       cards.forEach(card => {
-          const groupName = String(card.dataset.catalog || '').trim() || '未分类';
+          const groupName = String(card.dataset.catalog || '').trim() || 'Uncategorized';
           if (!grouped.has(groupName)) grouped.set(groupName, []);
           grouped.get(groupName).push(card);
       });
@@ -1043,7 +888,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="bookmark-group-name">${escapeHTML(groupName)}</span>
                 <span class="bookmark-group-count">${orderedCards.length}</span>
               </div>
-              <span class="bookmark-group-sort-hint">拖动排序</span>
+              <span class="bookmark-group-sort-hint">鎷栧姩鎺掑簭</span>
             </div>
           `;
 
@@ -1070,12 +915,12 @@ document.addEventListener('DOMContentLoaded', function() {
       const sitesGrid = document.getElementById('sitesGrid');
       if (!sitesGrid) return;
       
-      // 使用全局配置获取布局设置，避免依赖 DOM 推断
+      // 浣跨敤鍏ㄥ眬閰嶇疆鑾峰彇甯冨眬璁剧疆锛岄伩鍏嶄緷璧?DOM 鎺ㄦ柇
       const config = window.IORI_LAYOUT_CONFIG || {};
       const cardStyle = config.cardStyle || 'style1';
       const useCompactCard = true;
       
-      // 优先从配置获取毛玻璃开关状态，CSS 变量作为回退
+      // 浼樺厛浠庨厤缃幏鍙栨瘺鐜荤拑寮€鍏崇姸鎬侊紝CSS 鍙橀噺浣滀负鍥為€€
       const computedStyle = getComputedStyle(document.documentElement);
       const frostedBlurVal = computedStyle.getPropertyValue('--frosted-glass-blur').trim();
       const isFrostedEnabled = config.enableFrostedGlass !== undefined 
@@ -1085,17 +930,17 @@ document.addEventListener('DOMContentLoaded', function() {
       sitesGrid.innerHTML = '';
       
       if (sites.length === 0) {
-          sitesGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10">本分类下暂无书签</div>';
+          sitesGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10">鏈垎绫讳笅鏆傛棤涔︾</div>';
           return;
       }
 
       sites.forEach((site, index) => {
-        const rawName = String(site.name || '未命名');
+        const rawName = String(site.name || 'Unnamed');
         const safeName = escapeHTML(rawName);
         const safeUrl = normalizeUrl(site.url);
-        const safeDesc = escapeHTML(site.desc || '暂无描述');
-        const safeCatalog = escapeHTML(site.catelog_name || site.catelog || '未分类');
-        const cardInitial = escapeHTML((rawName.trim().charAt(0) || '站').toUpperCase());
+        const safeDesc = escapeHTML(site.desc || 'No description');
+        const safeCatalog = escapeHTML(site.catelog_name || site.catelog || 'Uncategorized');
+        const cardInitial = escapeHTML((rawName.trim().charAt(0) || 'U').toUpperCase());
         
         const logoHtml = site.logo 
              ? `<img src="${escapeHTML(site.logo)}" alt="${safeName}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700" decoding="async" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.classList.remove('hidden');">
@@ -1125,7 +970,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Remove animation class after completion to ensure clean state
         card.addEventListener('animationend', () => {
             card.classList.remove('card-anim-enter');
-            card.style.animation = 'none'; // 彻底禁用动画，防止干扰 Hover
+            card.style.animation = 'none'; // 褰诲簳绂佺敤鍔ㄧ敾锛岄槻姝㈠共鎵?Hover
             if (delay > 0) card.style.removeProperty('animation-delay');
         }, { once: true });
         
@@ -1164,13 +1009,10 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function updateNavigationState(catalogId) {
-      // 1. Update states on standard nav items (in main container and dropdown)
-      // 注意：不再调用 resetNav() 以避免打断用户交互
-      const allLinks = document.querySelectorAll('a.nav-btn, a.dropdown-item');
-      allLinks.forEach(link => {
-          const linkId = link.getAttribute('data-id');
-          const isActive = (!catalogId && !linkId) || (String(linkId) === String(catalogId));
-          
+      const allLinks = document.querySelectorAll('#horizontalCategoryNav a.nav-btn');
+      allLinks.forEach((link) => {
+          const linkId = String(link.getAttribute('data-id') || '').trim();
+          const isActive = (!catalogId && !linkId) || (linkId && String(linkId) === String(catalogId));
           if (isActive) {
               link.classList.remove('inactive');
               link.classList.add('active', 'nav-item-active');
@@ -1178,85 +1020,18 @@ document.addEventListener('DOMContentLoaded', function() {
               link.classList.remove('active', 'nav-item-active');
               link.classList.add('inactive');
           }
-          // 保存状态，供 checkOverflow 恢复使用
-          link.dataset.originalClass = link.className;
       });
 
-      // 2. Parent highlighting
-      const navContainer = document.getElementById('horizontalCategoryNav');
-      if (navContainer) {
-          const topWrappers = Array.from(navContainer.children);
-          topWrappers.forEach(wrapper => {
-              const topLink = wrapper.querySelector(':scope > a.nav-btn'); 
-              if (!topLink) return;
-              
-              const topLinkId = topLink.getAttribute('data-id');
-              // 如果顶级项不是当前分类，检查其子项是否有匹配
-              if (String(topLinkId) !== String(catalogId)) {
-                  const subLink = wrapper.querySelector(`a[data-id="${catalogId}"]`);
-                  if (subLink) {
-                      topLink.classList.remove('inactive');
-                      topLink.classList.add('active', 'nav-item-active');
-                      topLink.dataset.originalClass = topLink.className;
-                  }
-              }
-          });
-      }
-      
-      // 3. Highlight "More" button if active category is inside dropdown
-      if (dropdown && moreBtn) {
-          const activeInDropdown = dropdown.querySelector('.active');
-          if (activeInDropdown) {
-               moreBtn.classList.add('active', 'text-primary-600', 'bg-secondary-100');
-               moreBtn.classList.remove('inactive');
-          } else {
-               moreBtn.classList.remove('active', 'text-primary-600', 'bg-secondary-100');
-               moreBtn.classList.add('inactive');
-          }
-      }
-
-      // 4. Highlight "All" button explicitly if no catalogId provided (means "All")
       if (!catalogId) {
-          const allBtn = document.querySelector('a[href="?catalog=all"]');
+          const allBtn = document.querySelector('#horizontalCategoryNav a[href="?catalog=all"]');
           if (allBtn) {
               allBtn.classList.remove('inactive');
               allBtn.classList.add('active', 'nav-item-active');
           }
       }
-      
-      // Update Sidebar (Vertical Menu)
-      const sidebar = document.getElementById('sidebar');
-      if (sidebar) {
-          const links = sidebar.querySelectorAll('a[data-id], a[href="?catalog=all"]');
-          links.forEach(link => {
-               const svg = link.querySelector('svg');
-               const linkId = link.getAttribute('data-id');
-               const isActive = (!catalogId && !linkId) || (String(linkId) === String(catalogId));
-
-               if (isActive) {
-                   // Active state
-                   link.classList.remove('hover:bg-gray-100', 'text-gray-700', 'dark:hover:bg-gray-800', 'dark:text-gray-300');
-                   link.classList.add('bg-secondary-100', 'text-primary-700', 'dark:bg-gray-800', 'dark:text-primary-400');
-                   
-                   if (svg) {
-                       svg.classList.remove('text-gray-400', 'dark:text-gray-500');
-                       svg.classList.add('text-primary-600', 'dark:text-primary-400');
-                   }
-               } else {
-                   // Inactive state
-                   link.classList.remove('bg-secondary-100', 'text-primary-700', 'dark:bg-gray-800', 'dark:text-primary-400');
-                   link.classList.add('hover:bg-gray-100', 'text-gray-700', 'dark:text-gray-300', 'dark:hover:bg-gray-800');
-                   
-                   if (svg) {
-                       svg.classList.remove('text-primary-600', 'dark:text-primary-400');
-                       svg.classList.add('text-gray-400', 'dark:text-gray-500');
-                   }
-               }
-          });
-      }
   }
 
-  // 辅助函数
+  // 杈呭姪鍑芥暟
   function escapeHTML(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -1365,7 +1140,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   if (themeToggleBtn) {
-      themeToggleBtn.title = '切换主题（双击恢复自动）';
+      themeToggleBtn.title = '鍒囨崲涓婚锛堝弻鍑绘仮澶嶈嚜鍔級';
 
       themeToggleBtn.addEventListener('click', () => {
           const isDark = document.documentElement.classList.contains('dark');
@@ -1396,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', function() {
           event.preventDefault();
           localStorage.setItem('theme_mode', 'auto');
           applyResolvedTheme();
-          showToast('已恢复自动主题模式');
+          showToast('Switched back to auto theme mode.');
       });
   }
 

@@ -1,8 +1,8 @@
-// functions/index.js
+﻿// functions/index.js
 import { isAdminAuthenticated } from './_middleware';
 import { FONT_MAP, SCHEMA_VERSION } from './constants';
 
-// 辅助函数
+// 杈呭姪鍑芥暟
 function escapeHTML(str) {
   if (!str) return '';
   return String(str)
@@ -36,28 +36,28 @@ function normalizeSortOrder(val) {
   return Number.isFinite(num) ? num : 9999;
 }
 
-// 内存缓存：热状态下跳过 KV 读取，只有冷启动时才查 KV
+// 鍐呭瓨缂撳瓨锛氱儹鐘舵€佷笅璺宠繃 KV 璇诲彇锛屽彧鏈夊喎鍚姩鏃舵墠鏌?KV
 let schemaMigrated = false;
 
 async function ensureSchema(env) {
-  // 热状态直接返回，不读 KV
+  // 鐑姸鎬佺洿鎺ヨ繑鍥烇紝涓嶈 KV
   if (schemaMigrated) return;
 
-  // 冷启动时检查 KV 中是否已完成迁移
+  // 鍐峰惎鍔ㄦ椂妫€鏌?KV 涓槸鍚﹀凡瀹屾垚杩佺Щ
   const migrated = await env.NAV_AUTH.get(`schema_migrated_${SCHEMA_VERSION}`);
   if (migrated) {
-    schemaMigrated = true;  // 更新内存缓存
+    schemaMigrated = true;  // 鏇存柊鍐呭瓨缂撳瓨
     return;
   }
 
   try {
-    // 批量执行所有索引创建（减少数据库往返）
+    // 鎵归噺鎵ц鎵€鏈夌储寮曞垱寤猴紙鍑忓皯鏁版嵁搴撳線杩旓級
     await env.NAV_DB.batch([
       env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_catelog_id ON sites(catelog_id)"),
       env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_sort_order ON sites(sort_order)")
     ]);
 
-    // 检查并添加缺失的列（使用 PRAGMA 更高效）
+    // 妫€鏌ュ苟娣诲姞缂哄け鐨勫垪锛堜娇鐢?PRAGMA 鏇撮珮鏁堬級
     const sitesColumns = await env.NAV_DB.prepare("PRAGMA table_info(sites)").all();
     const sitesCols = new Set(sitesColumns.results.map(c => c.name));
     
@@ -86,12 +86,12 @@ async function ensureSchema(env) {
     }
 
     if (alterStatements.length > 0) {
-      // SQLite 不支持批量 ALTER，需要逐个执行
+      // SQLite 涓嶆敮鎸佹壒閲?ALTER锛岄渶瑕侀€愪釜鎵ц
       for (const stmt of alterStatements) {
         try { await stmt.run(); } catch (e) { console.log('Column may already exist:', e.message); }
       }
       
-      // 同步 catelog_name 数据（仅在添加字段后执行一次）
+      // 鍚屾 catelog_name 鏁版嵁锛堜粎鍦ㄦ坊鍔犲瓧娈靛悗鎵ц涓€娆★級
       if (!sitesCols.has('catelog_name')) {
         await env.NAV_DB.prepare(`
           UPDATE sites 
@@ -101,9 +101,8 @@ async function ensureSchema(env) {
       }
     }
 
-    // 标记迁移完成（永久缓存，直到 SCHEMA_VERSION 变更）
-    await env.NAV_AUTH.put(`schema_migrated_${SCHEMA_VERSION}`, 'true');
-    schemaMigrated = true;  // 更新内存缓存
+    // 鏍囪杩佺Щ瀹屾垚锛堟案涔呯紦瀛橈紝鐩村埌 SCHEMA_VERSION 鍙樻洿锛?    await env.NAV_AUTH.put(`schema_migrated_${SCHEMA_VERSION}`, 'true');
+    schemaMigrated = true;  // 鏇存柊鍐呭瓨缂撳瓨
     console.log('Schema migration completed');
   } catch (e) {
     console.error('Schema migration failed:', e);
@@ -113,13 +112,12 @@ async function ensureSchema(env) {
 export async function onRequest(context) {
   const { request, env } = context;
   
-  // 使用 KV 缓存 Schema 迁移状态，避免每次冷启动都检查
-  await ensureSchema(env);
+  // 浣跨敤 KV 缂撳瓨 Schema 杩佺Щ鐘舵€侊紝閬垮厤姣忔鍐峰惎鍔ㄩ兘妫€鏌?  await ensureSchema(env);
 
   const isAuthenticated = await isAdminAuthenticated(request, env);
   const includePrivate = isAuthenticated ? 1 : 0;
 
-  // 1. 尝试读取 KV 缓存 (仅针对无查询参数的首页请求)
+  // 1. 灏濊瘯璇诲彇 KV 缂撳瓨 (浠呴拡瀵规棤鏌ヨ鍙傛暟鐨勯椤佃姹?
   const url = new URL(request.url);
   const isHomePage = url.pathname === '/' && !url.search;
   
@@ -160,7 +158,7 @@ export async function onRequest(context) {
     }
   }
 
-  // 并行执行数据库查询（分类、设置、站点）
+  // 骞惰鎵ц鏁版嵁搴撴煡璇紙鍒嗙被銆佽缃€佺珯鐐癸級
   const categoryQuery = isAuthenticated 
     ? 'SELECT * FROM category ORDER BY sort_order ASC, id ASC'
     : `SELECT * FROM category
@@ -180,8 +178,7 @@ export async function onRequest(context) {
     'home_site_name', 'home_site_description',
     'home_search_engine_enabled', 'home_search_engine_provider',
     'home_theme_mode', 'home_theme_auto_dark_start', 'home_theme_auto_dark_end',
-    'home_default_category', 'home_remember_last_category',
-    'layout_grid_cols', 'layout_custom_wallpaper', 'layout_menu_layout',
+    'layout_grid_cols', 'layout_custom_wallpaper',
     'layout_random_wallpaper', 'bing_country',
     'layout_enable_frosted_glass', 'layout_frosted_glass_intensity',
     'layout_enable_bg_blur', 'layout_bg_blur_intensity', 'layout_card_style',
@@ -199,14 +196,13 @@ export async function onRequest(context) {
                       END) = 0 OR ? = 1) 
                       ORDER BY sort_order ASC, create_time DESC`;
 
-  // 并行执行所有查询
-  const [categoriesResult, settingsResult, sitesResult] = await Promise.all([
+  // 骞惰鎵ц鎵€鏈夋煡璇?  const [categoriesResult, settingsResult, sitesResult] = await Promise.all([
     env.NAV_DB.prepare(categoryQuery).all().catch(e => ({ results: [], error: e })),
     env.NAV_DB.prepare(`SELECT key, value FROM settings WHERE key IN (${settingsPlaceholders})`).bind(...settingsKeys).all().catch(e => ({ results: [], error: e })),
     env.NAV_DB.prepare(sitesQuery).bind(includePrivate).all().catch(e => ({ results: [], error: e }))
   ]);
 
-  // 处理分类结果
+  // 澶勭悊鍒嗙被缁撴灉
   let categories = categoriesResult.results || [];
   if (categoriesResult.error) {
     console.error('Failed to fetch categories:', categoriesResult.error);
@@ -239,7 +235,7 @@ export async function onRequest(context) {
   };
   sortCats(rootCategories);
 
-  // 处理设置结果
+  // 澶勭悊璁剧疆缁撴灉
   let layoutHideDesc = false;
   let layoutHideLinks = false;
   let layoutHideCategory = false;
@@ -265,11 +261,8 @@ export async function onRequest(context) {
   let homeThemeMode = 'auto';
   let homeThemeAutoDarkStart = '19';
   let homeThemeAutoDarkEnd = '7';
-  let homeDefaultCategory = '';
-  let homeRememberLastCategory = false;
   let layoutGridCols = '4';
   let layoutCustomWallpaper = '';
-  let layoutMenuLayout = 'horizontal';
   let layoutRandomWallpaper = false;
   let bingCountry = '';
   let layoutEnableFrostedGlass = false;
@@ -324,12 +317,9 @@ export async function onRequest(context) {
       if (row.key === 'home_theme_mode') homeThemeMode = row.value;
       if (row.key === 'home_theme_auto_dark_start') homeThemeAutoDarkStart = row.value;
       if (row.key === 'home_theme_auto_dark_end') homeThemeAutoDarkEnd = row.value;
-      if (row.key === 'home_default_category') homeDefaultCategory = row.value;
-      if (row.key === 'home_remember_last_category') homeRememberLastCategory = row.value === 'true';
 
       if (row.key === 'layout_grid_cols') layoutGridCols = row.value;
       if (row.key === 'layout_custom_wallpaper') layoutCustomWallpaper = row.value;
-      if (row.key === 'layout_menu_layout') layoutMenuLayout = row.value;
       if (row.key === 'layout_random_wallpaper') layoutRandomWallpaper = row.value === 'true';
       if (row.key === 'bing_country') bingCountry = row.value;
       if (row.key === 'layout_enable_frosted_glass') layoutEnableFrostedGlass = row.value === 'true';
@@ -370,31 +360,20 @@ export async function onRequest(context) {
   homeThemeAutoDarkStart = normalizeThemeHour(homeThemeAutoDarkStart, 19);
   homeThemeAutoDarkEnd = normalizeThemeHour(homeThemeAutoDarkEnd, 7);
 
-  // 处理站点结果
+  // 澶勭悊绔欑偣缁撴灉
   let allSites = sitesResult.results || [];
   if (sitesResult.error) {
     return new Response(`Failed to fetch sites: ${sitesResult.error.message}`, { status: 500 });
   }
 
-  // 确定目标分类
-  let requestedCatalogName = (url.searchParams.get('catalog') || '').trim();
-  const explicitAll = requestedCatalogName.toLowerCase() === 'all';
-  
-  if (explicitAll) {
-      requestedCatalogName = '';
-  }
-
+  // 纭畾鐩爣鍒嗙被
   let currentCatalogName = '';
-  const catalogExists = requestedCatalogName && categoryIdMap.has(requestedCatalogName);
+  const catalogExists = false;
 
-  if (catalogExists) {
-      currentCatalogName = requestedCatalogName;
-  }
-
-  // 始终展示全部站点（分类导航改为定位分组模式）
+  // 濮嬬粓灞曠ず鍏ㄩ儴绔欑偣锛堝垎绫诲鑸敼涓哄畾浣嶅垎缁勬ā寮忥級
   let sites = allSites;
 
-  // 随机壁纸轮询
+  // 闅忔満澹佺焊杞
   let nextWallpaperIndex = 0;
   if (layoutRandomWallpaper) {
     try {
@@ -518,212 +497,55 @@ export async function onRequest(context) {
 
   
 
-    // 4. 生成动态菜单
-
-    const renderHorizontalMenu = (cats, level = 0) => {
-
-        if (!cats || cats.length === 0) return '';
-
-        
-
-        return cats.map(cat => {
-
-            const isActive = (currentCatalogName === cat.catelog);
-
-            const hasChildren = cat.children && cat.children.length > 0;
-
-            const safeName = escapeHTML(cat.catelog);
-
-            const encodedName = encodeURIComponent(cat.catelog);
-
-            const linkUrl = `?catalog=${encodedName}`;
-
-            
-
-            let html = '';
-
-            if (level === 0) {
-
-                const activeClass = isActive ? 'active' : 'inactive';
-
-                const navItemActiveClass = isActive ? 'nav-item-active' : '';
-
-                
-
-                html += `<div class="menu-item-wrapper relative inline-block text-left">`;
-
-                html += `<a href="${linkUrl}" class="nav-btn ${activeClass} ${navItemActiveClass}" data-id="${cat.id}">
-
-                            ${safeName}
-
-                            ${hasChildren ? '<svg class="w-3 h-3 ml-1 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>' : ''}
-
-                         </a>`;
-
-                if (hasChildren) {
-
-                    html += `<div class="dropdown-menu">`;
-
-                    html += renderHorizontalMenu(cat.children, level + 1);
-
-                    html += `</div>`;
-
-                }
-
-                html += `</div>`;
-
-            } else {
-
-                const activeClass = isActive ? 'active' : '';
-
-                const navItemActiveClass = isActive ? 'nav-item-active' : '';
-
-                
-
-                html += `<div class="menu-item-wrapper relative block w-full">`;
-
-                html += `<a href="${linkUrl}" class="dropdown-item ${activeClass} ${navItemActiveClass}" data-id="${cat.id}">
-
-                            ${safeName}
-
-                            ${hasChildren ? '<svg class="dropdown-arrow-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>' : ''}
-
-                         </a>`;
-
-                if (hasChildren) {
-
-                    html += `<div class="dropdown-menu">`;
-
-                    html += renderHorizontalMenu(cat.children, level + 1);
-
-                    html += `</div>`;
-
-                }
-
-                html += `</div>`;
-
-            }
-
-            return html;
-
-        }).join('');
-
-    };
-
-  
-
-    const allLinkActive = !catalogExists;
-
-    const allLinkClass = allLinkActive ? 'active' : 'inactive';
-
-    const allLinkActiveMarker = allLinkActive ? 'nav-item-active' : '';
-
-    
-
-    const horizontalAllLink = `
-
-        <div class="menu-item-wrapper relative inline-block text-left">
-
-          <a href="?catalog=all" class="nav-btn ${allLinkClass} ${allLinkActiveMarker}">
-
-              全部
-
-          </a>
-
-        </div>
-
-    `;
-
-    
-
-    const horizontalCatalogMarkup = horizontalAllLink + renderHorizontalMenu(rootCategories);
-
-  
-
-    // Vertical Menu (Sidebar)
-
-    const renderVerticalMenu = (cats, level = 0) => {
-
-        return cats.map(cat => {
-
-            const safeName = escapeHTML(cat.catelog);
-
-            const encodedName = encodeURIComponent(cat.catelog);
-
-            const isActive = currentCatalogName === cat.catelog;
-
-            
-
-                        const baseClass = "flex items-center px-3 py-2 rounded-lg w-full transition-colors duration-200";
-
-            
-
-                        const activeClass = isActive ? "bg-secondary-100 text-primary-700 dark:bg-gray-800 dark:text-primary-400" : "hover:bg-gray-100 text-gray-700 dark:text-gray-300 dark:hover:bg-gray-800";
-
-            
-
-                        // Use darker icon color for custom wallpaper mode to ensure visibility
-
-            
-
-                        const defaultIconColor = isCustomWallpaper ? "text-gray-600" : "text-gray-400 dark:text-gray-500";
-
-            
-
-                        const iconClass = isActive ? "text-primary-600 dark:text-primary-400" : defaultIconColor;
-
-            const indent = level * 12; 
-
-            
-
-            let html = `
-
-              <a href="?catalog=${encodedName}" data-id="${cat.id}" class="${baseClass} ${activeClass}" style="padding-left: ${12 + indent}px">
-
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 ${iconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-
-                  </svg>
-
-                  ${safeName}
-
-              </a>
-
-            `;
-
-            if (cat.children && cat.children.length > 0) {
-
-                html += renderVerticalMenu(cat.children, level + 1);
-
-            }
-
-            return html;
-
-        }).join('');
-
-    };
-
-    
-
-    const catalogLinkMarkup = renderVerticalMenu(rootCategories);
+    // 4. 鐢熸垚鍔ㄦ€佽彍鍗?
+    const flattenCategories = (cats, level = 0, acc = []) => {
+    if (!Array.isArray(cats)) return acc;
+    cats.forEach((cat) => {
+      acc.push({ id: cat.id, name: cat.catelog, level });
+      if (Array.isArray(cat.children) && cat.children.length > 0) {
+        flattenCategories(cat.children, level + 1, acc);
+      }
+    });
+    return acc;
+  };
+
+  const flatCategories = flattenCategories(rootCategories);
+  const allLinkClass = catalogExists ? 'inactive' : 'active nav-item-active';
+
+  const renderUnifiedCategoryLinks = (entries) => entries.map((entry) => {
+    const isActive = currentCatalogName === entry.name;
+    const stateClass = isActive ? 'active nav-item-active' : 'inactive';
+    const level = Number.isFinite(entry.level) ? Math.max(0, Math.min(4, entry.level)) : 0;
+    const levelPrefix = level > 0 ? `${'· '.repeat(level)}` : '';
+    const safeLabel = escapeHTML(`${levelPrefix}${entry.name}`);
+    const safeTitle = escapeHTML(String(entry.name || ''));
+    const encodedName = encodeURIComponent(entry.name);
+    return `<a href="?catalog=${encodedName}" class="nav-btn catalog-chip ${stateClass}" data-id="${entry.id}" data-level="${level}" title="${safeTitle}">${safeLabel}</a>`;
+  }).join('');
+
+  const horizontalCatalogMarkup = `
+    <a href="?catalog=all" class="nav-btn ${allLinkClass}" data-role="all-catalog">全部</a>
+    ${renderUnifiedCategoryLinks(flatCategories)}
+  `;
+
+  const catalogLinkMarkup = '';
 
   
 
     // Sites Grid
     let sitesGridMarkup = sites.map((site, index) => {
-                      const rawName = site.name || '未命名';
-                  const rawCatalog = site.catelog_name || '未分类';
+                      const rawName = site.name || '鏈懡鍚?;
+                  const rawCatalog = site.catelog_name || '鏈垎绫?;
 
-      const rawDesc = site.desc || '暂无描述';
+      const rawDesc = site.desc || '鏆傛棤鎻忚堪';
 
       const normalizedUrl = sanitizeUrl(site.url);
 
-      const safeDisplayUrl = normalizedUrl || '未提供链接';
+      const safeDisplayUrl = normalizedUrl || '鏈彁渚涢摼鎺?;
 
       const logoUrl = sanitizeUrl(site.logo);
 
-      const cardInitial = escapeHTML((rawName.trim().charAt(0) || '站').toUpperCase());
+      const cardInitial = escapeHTML((rawName.trim().charAt(0) || '绔?).toUpperCase());
 
       const safeName = escapeHTML(rawName);
 
@@ -795,11 +617,11 @@ export async function onRequest(context) {
 
   
 
-                      ${layoutGridCols >= '5' ? '' : '<span class="copy-text">复制</span>'}
+                      ${layoutGridCols >= '5' ? '' : '<span class="copy-text">澶嶅埗</span>'}
 
   
 
-                      <span class="copy-success hidden absolute -top-8 right-0 bg-accent-500 text-white text-xs px-2 py-1 rounded shadow-md">已复制!</span>
+                      <span class="copy-success hidden absolute -top-8 right-0 bg-accent-500 text-white text-xs px-2 py-1 rounded shadow-md">宸插鍒?</span>
 
   
 
@@ -915,7 +737,7 @@ export async function onRequest(context) {
 
   
 
-                                <div class="${baseCardClass} ${frostedClass} ${cardStyleClass} card-anim-enter" ${animStyle} data-id="${site.id}" data-name="${escapeHTML(site.name)}" data-url="${escapeHTML(normalizedUrl)}" data-catalog-id="${escapeHTML(String(site.catelog_id ?? ''))}" data-catalog="${escapeHTML(site.catelog_name || site.catelog || '未分类')}" data-desc="${safeDesc}">
+                                <div class="${baseCardClass} ${frostedClass} ${cardStyleClass} card-anim-enter" ${animStyle} data-id="${site.id}" data-name="${escapeHTML(site.name)}" data-url="${escapeHTML(normalizedUrl)}" data-catalog-id="${escapeHTML(String(site.catelog_id ?? ''))}" data-catalog="${escapeHTML(site.catelog_name || site.catelog || '鏈垎绫?)}" data-desc="${safeDesc}">
 
   
 
@@ -988,8 +810,8 @@ export async function onRequest(context) {
     }).join('');
 
   if (sites.length === 0) {
-      const emptyStateText = categories.length === 0 ? '欢迎使用 iori-nav' : '暂无书签';
-      const emptyStateSub = categories.length === 0 ? '项目初始化完成，请前往后台添加分类和书签。' : '该分类下还没有添加任何书签。';
+      const emptyStateText = categories.length === 0 ? '娆㈣繋浣跨敤 iori-nav' : '鏆傛棤涔︾';
+      const emptyStateSub = categories.length === 0 ? '椤圭洰鍒濆鍖栧畬鎴愶紝璇峰墠寰€鍚庡彴娣诲姞鍒嗙被鍜屼功绛俱€? : '璇ュ垎绫讳笅杩樻病鏈夋坊鍔犱换浣曚功绛俱€?;
       
       sitesGridMarkup = `
         <div class="col-span-full flex flex-col items-center justify-center py-24 text-center animate-fade-in">
@@ -1007,7 +829,7 @@ export async function onRequest(context) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    前往管理后台
+                    鍓嶅線绠＄悊鍚庡彴
                 </a>` : ''
             }
         </div>
@@ -1016,12 +838,10 @@ export async function onRequest(context) {
 
   let gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 justify-items-center';
   if (layoutGridCols === '5') {
-      // 1024px+ 显示 5 列
-      gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 justify-items-center';
+      // 1024px+ 鏄剧ず 5 鍒?      gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 justify-items-center';
   } else if (layoutGridCols === '6') {
-      // 1024px+ 显示 5 列, 1280px+ 显示 6 列 (优化：1200px 左右也可尝试 6 列，但考虑到侧边栏，保险起见 1280px 切 6 列，但 1024px 切 5 列已经比原来 4 列好了)
-      // 用户反馈 1200px 只有 4 列太少，现在 1200px 会是 5 列。
-      // 也可以加入 min-[1200px]:grid-cols-6
+      // 1024px+ 鏄剧ず 5 鍒? 1280px+ 鏄剧ず 6 鍒?(浼樺寲锛?200px 宸﹀彸涔熷彲灏濊瘯 6 鍒楋紝浣嗚€冭檻鍒颁晶杈规爮锛屼繚闄╄捣瑙?1280px 鍒?6 鍒楋紝浣?1024px 鍒?5 鍒楀凡缁忔瘮鍘熸潵 4 鍒楀ソ浜?
+      // 鐢ㄦ埛鍙嶉 1200px 鍙湁 4 鍒楀お灏戯紝鐜板湪 1200px 浼氭槸 5 鍒椼€?      // 涔熷彲浠ュ姞鍏?min-[1200px]:grid-cols-6
       gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 min-[1200px]:grid-cols-6 gap-3 sm:gap-6 justify-items-center';
   } else if (layoutGridCols === '7') {
       gridClass = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-6 justify-items-center';
@@ -1030,8 +850,8 @@ export async function onRequest(context) {
   const datalistOptions = categories.map((cat) => `<option value="${escapeHTML(cat.catelog)}">`).join('');
   
   const headingPlainText = currentCatalogName
-    ? `${currentCatalogName} · ${sites.length} 个书签`
-    : `全部收藏 · ${sites.length} 个书签`;
+    ? `${currentCatalogName} 路 ${sites.length} 涓功绛綻
+    : `鍏ㄩ儴鏀惰棌 路 ${sites.length} 涓功绛綻;
   const headingText = escapeHTML(headingPlainText);
   const headingDefaultAttr = escapeHTML(headingPlainText);
   const headingActiveAttr = catalogExists ? escapeHTML(currentCatalogName) : '';
@@ -1066,160 +886,78 @@ export async function onRequest(context) {
   const horizontalSubtitleHtml = layoutHideSubtitle ? '' : `<p class="${subTextColorClass} opacity-90 text-sm md:text-base" ${subtitleStyle}>{{SITE_DESCRIPTION}}</p>`;
 
   const searchPlaceholderMap = {
-    local: '搜索书签...',
-    google: 'Google 搜索...',
-    baidu: '百度搜索...',
-    bing: 'Bing 搜索...'
+    local: '鎼滅储涔︾...',
+    google: 'Google 鎼滅储...',
+    baidu: '鐧惧害鎼滅储...',
+    bing: 'Bing 鎼滅储...'
   };
   const searchInputPlaceholder = searchPlaceholderMap[homeSearchEngineProvider] || searchPlaceholderMap.local;
 
-  const verticalHeaderContent = `
-      <div class="max-w-4xl mx-auto text-center relative z-10 ${themeClass} py-8">
-        <div class="mb-8">
-            ${horizontalTitleHtml}
-            ${horizontalSubtitleHtml}
-        </div>
+  const headerContent = `
+    <div class="max-w-5xl mx-auto text-center relative z-10 ${themeClass}">
+      <div class="max-w-4xl mx-auto mb-8">
+        ${horizontalTitleHtml}
+        ${horizontalSubtitleHtml}
+      </div>
 
-        <div class="relative max-w-xl mx-auto">
-            <div class="search-input-target-wrapper relative">
-                <div class="relative">
-                    <input type="text" name="search" aria-label="搜索" placeholder="${searchInputPlaceholder}" class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                </div>
-                <div class="suggestion-dropdown hidden">
-                    <ul class="suggestion-list"></ul>
-                </div>
-            </div>
-        </div>
-      </div>`;
-      
-  const horizontalHeaderContent = `
-      <div class="max-w-5xl mx-auto text-center relative z-10 ${themeClass}">
-        <div class="max-w-4xl mx-auto mb-8">
-            ${horizontalTitleHtml}
-            ${horizontalSubtitleHtml}
-        </div>
-
-        <div class="relative max-w-xl mx-auto mb-8">
-            <div class="search-input-target-wrapper relative">
-                <div class="relative">
-                    <input id="headerSearchInput" type="text" name="search" aria-label="搜索" placeholder="${searchInputPlaceholder}" class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                </div>
-                <div id="suggestionDropdown" class="suggestion-dropdown hidden">
-                    <ul id="suggestionList" class="suggestion-list"></ul>
-                </div>
-            </div>
-        </div>
-        
-        <div class="relative max-w-5xl mx-auto">
-            <div id="horizontalCategoryNav" class="flex flex-wrap justify-center items-center gap-3 overflow-hidden transition-all duration-300" style="max-height: 60px;">
-                ${horizontalCatalogMarkup}
-                <div id="horizontalMoreWrapper" class="relative hidden">
-                    <button id="horizontalMoreBtn" class="nav-btn inactive">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                        </svg>
-                    </button>
-                    <div id="horizontalMoreDropdown" class="dropdown-menu hidden absolute mt-2 w-auto z-50">
-                        <!-- Dropdown items will be moved here by JS -->
-                    </div>
-                </div>
-            </div>
+      <div class="relative max-w-xl mx-auto mb-8">
+        <div class="search-input-target-wrapper relative">
+          <div class="relative">
+            <input id="headerSearchInput" type="text" name="search" aria-label="搜索" placeholder="${searchInputPlaceholder}" class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <div id="suggestionDropdown" class="suggestion-dropdown hidden">
+            <ul id="suggestionList" class="suggestion-list"></ul>
+          </div>
         </div>
       </div>
+
+      <div class="relative max-w-5xl mx-auto">
+        <div id="horizontalCategoryNav" class="unified-category-nav flex flex-wrap justify-center items-center gap-2 sm:gap-3">
+          ${horizontalCatalogMarkup}
+        </div>
+      </div>
+    </div>
   `;
 
-  let sidebarClass = '';
-  let mainClass = 'lg:ml-64';
-  let sidebarToggleClass = '';
-  let mobileToggleVisibilityClass = 'lg:hidden';
+  let sidebarClass = 'hidden';
+  let mainClass = '';
+  let sidebarToggleClass = '!hidden';
   let githubIconHtml = '';
   let adminIconHtml = '';
-  let themeIconHtml = `
+  const themeIconHtml = `
     <button id="themeToggleBtn" class="flex items-center justify-center p-2 rounded-lg bg-white/80 backdrop-blur shadow-md hover:bg-white text-gray-700 hover:text-amber-500 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:text-yellow-300 transition-all cursor-pointer" title="切换主题">
-      <!-- Sun Icon (Light Mode) -->
       <svg id="themeIconSun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block dark:hidden"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
-      <!-- Moon Icon (Dark Mode) -->
       <svg id="themeIconMoon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden dark:block"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     </button>
   `;
-  
-  let headerContent = verticalHeaderContent;
 
-  if (layoutMenuLayout === 'horizontal') {
-      sidebarClass = 'min-[550px]:hidden';
-      mainClass = '';
-      sidebarToggleClass = '!hidden';
-      mobileToggleVisibilityClass = 'min-[550px]:hidden';
-      
-      if (!homeHideGithub) {
-          githubIconHtml = `
-          <a href="https://slink.661388.xyz/iori-nav" target="_blank" class="fixed top-4 left-4 z-50 hidden min-[550px]:flex items-center justify-center p-2 rounded-lg bg-white/80 backdrop-blur shadow-md hover:bg-white text-gray-700 hover:text-black dark:bg-gray-800/80 dark:text-gray-200 dark:hover:text-white transition-all" title="GitHub">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg>
-          </a>
-          `;
-      }
-      
-      if (!homeHideAdmin) {
-          adminIconHtml = `
-          <a href="/admin" target="_blank" class="flex items-center justify-center p-2 rounded-lg bg-white/80 backdrop-blur shadow-md hover:bg-white text-gray-700 hover:text-primary-600 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:text-primary-400 transition-all" title="后台管理">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M7 18a5 5 0 0 1 10 0"/></path></svg>
-          </a>
-          `;
-      }
-
-      headerContent = `
-        <div class="min-[550px]:hidden">
-            ${verticalHeaderContent}
-        </div>
-        <div class="hidden min-[550px]:block">
-            ${horizontalHeaderContent}
-        </div>
-      `;
+  if (!homeHideGithub) {
+    githubIconHtml = `
+      <a href="https://slink.661388.xyz/iori-nav" target="_blank" class="fixed top-4 left-4 z-50 flex items-center justify-center p-2 rounded-lg bg-white/80 backdrop-blur shadow-md hover:bg-white text-gray-700 hover:text-black dark:bg-gray-800/80 dark:text-gray-200 dark:hover:text-white transition-all" title="GitHub">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg>
+      </a>
+    `;
   }
-  
-  // Combine for Top Right
+
+  if (!homeHideAdmin) {
+    adminIconHtml = `
+      <a href="/admin" target="_blank" class="flex items-center justify-center p-2 rounded-lg bg-white/80 backdrop-blur shadow-md hover:bg-white text-gray-700 hover:text-primary-600 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:text-primary-400 transition-all" title="后台管理">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M7 18a5 5 0 0 1 10 0"></path></svg>
+      </a>
+    `;
+  }
+
   const topRightActionsHtml = `
     <div class="fixed top-4 right-4 z-50 flex items-center gap-3">
-        ${themeIconHtml}
-        ${adminIconHtml}
+      ${themeIconHtml}
+      ${adminIconHtml}
     </div>
   `;
-  
-  // Also handle Sidebar GitHub/Admin icons visibility in Vertical Mode
-  // If we are in vertical mode, `githubIconHtml` is empty.
-  // The sidebar content is in `public/index.html`.
-  // We need to inject a class or hide them via replacement.
-  
-  // To keep it simple and safe:
-  // I will add a new replacement for `{{SIDEBAR_GITHUB_CLASS}}` and `{{SIDEBAR_ADMIN_CLASS}}` in `public/index.html`?
-  // But I haven't modified `public/index.html` to include those placeholders.
-  // So I have to use string replacement on known HTML structure.
-  
-  // Replace sidebar GitHub link:
-  // <a href="https://slink.661388.xyz/iori-nav" ... title="GitHub">
-  // If homeHideGithub is true, replace with empty string or hidden class.
-  
-  const sidebarGithubLinkPattern = /<a href="https:\/\/slink\.661388\.xyz\/iori-nav"[^>]*title="GitHub">[\s\S]*?<\/a>/;
-  const sidebarAdminLinkPattern = /<a href="\/admin"[^>]*>[\s\S]*?后台管理[\s\S]*?<\/a>/;
-  
-  // I'll do this replacement after fetching the template.
-  
-  const leftTopActionHtml = `
-  <div class="fixed top-4 left-4 z-50 ${mobileToggleVisibilityClass}">
-    <button id="sidebarToggle" class="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-500 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    </button>
-  </div>
-  ${githubIconHtml}
-  `;
+
+  const leftTopActionHtml = `${githubIconHtml}`;
 
   const footerClass = isCustomWallpaper
       ? 'bg-transparent py-8 px-6 mt-12 border-none shadow-none text-black dark:text-gray-200'
@@ -1227,6 +965,23 @@ export async function onRequest(context) {
       
   const templateResponse = await env.ASSETS.fetch(new URL('/index.html', request.url));
   let html = await templateResponse.text();
+
+  // Inject runtime asset version to avoid stale immutable asset cache after deployments.
+  const applyRuntimeAssetVersion = (markup, assetPath) => {
+    const escaped = assetPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`(${escaped})(?:\\?v=[a-zA-Z0-9_-]+)?(?=["'])`, 'g');
+    return markup.replace(pattern, `$1?v=${deploymentTag}`);
+  };
+  const runtimeVersionedAssets = [
+    '/css/style.css',
+    '/css/tailwind.min.css',
+    '/js/autocomplete.js',
+    '/js/main.js',
+    '/favicon.svg'
+  ];
+  runtimeVersionedAssets.forEach((assetPath) => {
+    html = applyRuntimeAssetVersion(html, assetPath);
+  });
   
   // Inject CSS to hide icons if requested (More robust than regex replacement)
   let hideIconsCss = '<style>';
@@ -1245,12 +1000,12 @@ export async function onRequest(context) {
   const safeWallpaperUrl = sanitizeUrl(layoutCustomWallpaper);
   const defaultBgColor = '#fdf8f3';
   
-  // 统一构建背景层逻辑 - 采用 img 标签方案以解决移动端缩放问题
+  // 缁熶竴鏋勫缓鑳屾櫙灞傞€昏緫 - 閲囩敤 img 鏍囩鏂规浠ヨВ鍐崇Щ鍔ㄧ缂╂斁闂
   let bgLayerHtml = '';
   
   if (safeWallpaperUrl) {
       const blurStyle = layoutEnableBgBlur ? `filter: blur(${layoutBgBlurIntensity}px); transform: scale(1.02);` : '';
-      // transform: scale(1.02) 是为了防止模糊后边缘出现白边
+      // transform: scale(1.02) 鏄负浜嗛槻姝㈡ā绯婂悗杈圭紭鍑虹幇鐧借竟
       
       bgLayerHtml = `
         <div id="fixed-background" style="position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;">
@@ -1263,7 +1018,7 @@ export async function onRequest(context) {
       `;
   }
   
-  // 注入全局样式
+  // 娉ㄥ叆鍏ㄥ眬鏍峰紡
   const globalScrollCss = `
     <style>
       html, body {
@@ -1276,27 +1031,27 @@ export async function onRequest(context) {
         width: 100%;
         height: var(--iori-stable-vh, 100svh);
         min-height: var(--iori-stable-vh, 100svh);
-        overflow-y: auto; /* 允许纵向滚动 */
+        overflow-y: auto; /* 鍏佽绾靛悜婊氬姩 */
         overflow-x: hidden;
-        -webkit-overflow-scrolling: touch; /* iOS 原生惯性滚动 */
+        -webkit-overflow-scrolling: touch; /* iOS 鍘熺敓鎯€ф粴鍔?*/
         position: relative;
         z-index: 1;
       }
       body {
         background-color: transparent !important;
-        overflow: hidden; /* 禁止 body 滚动，交由 #app-scroll 管理 */
+        overflow: hidden; /* 绂佹 body 婊氬姩锛屼氦鐢?#app-scroll 绠＄悊 */
         min-height: var(--iori-stable-vh, 100svh);
         position: relative;
       }
       #fixed-background {
-        /* 仅对必要的属性进行平滑过渡 */
+        /* 浠呭蹇呰鐨勫睘鎬ц繘琛屽钩婊戣繃娓?*/
         transition: background-color 0.3s ease, filter 0.3s ease;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
       }
-      /* 修复 iOS 上 100vh 问题 (针对背景层) */
+      /* 淇 iOS 涓?100vh 闂 (閽堝鑳屾櫙灞? */
       @supports (-webkit-touch-callout: none) {
         #app-scroll {
           height: var(--iori-stable-vh, 100svh);
@@ -1308,11 +1063,10 @@ export async function onRequest(context) {
 
   html = html.replace('</head>', `${globalScrollCss}</head>`);
   
-  // 替换 body 标签结构，增加 #app-scroll 滚动容器
-  html = html.replace('<body class="bg-secondary-50 font-sans text-gray-800">', `<body class="bg-secondary-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-100 relative ${isCustomWallpaper ? 'custom-wallpaper' : ''}">${bgLayerHtml}<div id="app-scroll">`);
+  // 鏇挎崲 body 鏍囩缁撴瀯锛屽鍔?#app-scroll 婊氬姩瀹瑰櫒
+  html = html.replace('<body class="bg-secondary-50 font-sans text-gray-800">', `<body class="bg-secondary-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-100 relative layout-unified ${isCustomWallpaper ? 'custom-wallpaper' : ''}">${bgLayerHtml}<div id="app-scroll">`);
   
-  // 闭合滚动容器（在 </main> 后关闭，使 #backToTop 和模态框脱离 #app-scroll 的层叠上下文）
-  html = html.replace('</main>', '</main></div>');
+  // 闂悎婊氬姩瀹瑰櫒锛堝湪 </main> 鍚庡叧闂紝浣?#backToTop 鍜屾ā鎬佹鑴辩 #app-scroll 鐨勫眰鍙犱笂涓嬫枃锛?  html = html.replace('</main>', '</main></div>');
   
   // Inject Card CSS Variables
   const cardRadius = parseInt(layoutCardBorderRadius) || 12;
@@ -1325,17 +1079,16 @@ export async function onRequest(context) {
   const cardCssVars = `<style>:root { --card-padding: 1.25rem; --card-radius: ${cardRadius}px; --card-scale: ${cardScale}; --frosted-glass-blur: ${frostedBlur}px; }</style>`;
   html = html.replace('</head>', `${cardCssVars}</head>`);
 
-  // 自动注入字体资源
+  // 鑷姩娉ㄥ叆瀛椾綋璧勬簮
   // ... (existing code omitted for brevity but I should match context)
   const usedFonts = new Set();
   
-  // 只有在元素显示时才添加对应的字体
+  // 鍙湁鍦ㄥ厓绱犳樉绀烘椂鎵嶆坊鍔犲搴旂殑瀛椾綋
   if (!layoutHideTitle && homeTitleFont) usedFonts.add(homeTitleFont);
   if (!layoutHideSubtitle && homeSubtitleFont) usedFonts.add(homeSubtitleFont);
   if (!homeHideStats && homeStatsFont) usedFonts.add(homeStatsFont);
   
-  // 卡片字体始终添加，因为它们是卡片的基本元素
-  if (cardTitleFont) usedFonts.add(cardTitleFont);
+  // 鍗＄墖瀛椾綋濮嬬粓娣诲姞锛屽洜涓哄畠浠槸鍗＄墖鐨勫熀鏈厓绱?  if (cardTitleFont) usedFonts.add(cardTitleFont);
   if (cardDescFont) usedFonts.add(cardDescFont);
   
   let fontLinksHtml = '';
@@ -1346,7 +1099,7 @@ export async function onRequest(context) {
       }
   });
   
-  // 兼容旧版自定义 URL
+  // 鍏煎鏃х増鑷畾涔?URL
   const safeCustomFontUrl = sanitizeUrl(homeCustomFontUrl);
   if (safeCustomFontUrl) {
       fontLinksHtml += `<link rel="stylesheet" href="${safeCustomFontUrl}">`;
@@ -1395,7 +1148,6 @@ export async function onRequest(context) {
         cardStyle: "${layoutCardStyle}",
         cardWidth: "${cardWidth}",
         enableFrostedGlass: ${layoutEnableFrostedGlass},
-        rememberLastCategory: ${homeRememberLastCategory},
         randomWallpaper: ${layoutRandomWallpaper},
         wallpaperSource: "${wallpaperSource}",
         wallpaperCid360: "${wallpaperCid360}",
@@ -1452,7 +1204,7 @@ export async function onRequest(context) {
       response.headers.append('Set-Cookie', 'iori_cache_stale=; Path=/; Max-Age=0; SameSite=Lax');
   }
 
-  // 写入缓存 (只要不是管理员强制刷新或 Stale 状态，都应该写入缓存，包括随机壁纸开启的情况)
+  // 鍐欏叆缂撳瓨 (鍙涓嶆槸绠＄悊鍛樺己鍒跺埛鏂版垨 Stale 鐘舵€侊紝閮藉簲璇ュ啓鍏ョ紦瀛橈紝鍖呮嫭闅忔満澹佺焊寮€鍚殑鎯呭喌)
   if (allowHomeCache) {
     const cacheKey = isAuthenticated ? cacheKeyPrivate : cacheKeyPublic;
     context.waitUntil(env.NAV_AUTH.put(cacheKey, html));
@@ -1460,3 +1212,4 @@ export async function onRequest(context) {
 
   return response;
 }
+
