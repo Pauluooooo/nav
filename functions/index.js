@@ -535,18 +535,18 @@ export async function onRequest(context) {
 
     // Sites Grid
     let sitesGridMarkup = sites.map((site, index) => {
-                      const rawName = site.name || '鏈懡鍚?;
-                  const rawCatalog = site.catelog_name || '鏈垎绫?;
+                      const rawName = site.name || 'Untitled';
+                  const rawCatalog = site.catelog_name || 'Uncategorized';
 
       const rawDesc = site.desc || '鏆傛棤鎻忚堪';
 
       const normalizedUrl = sanitizeUrl(site.url);
 
-      const safeDisplayUrl = normalizedUrl || '鏈彁渚涢摼鎺?;
+      const safeDisplayUrl = normalizedUrl || 'No URL';
 
       const logoUrl = sanitizeUrl(site.logo);
 
-      const cardInitial = escapeHTML((rawName.trim().charAt(0) || '绔?).toUpperCase());
+      const cardInitial = escapeHTML((rawName.trim().charAt(0) || 'U').toUpperCase());
 
       const safeName = escapeHTML(rawName);
 
@@ -738,7 +738,7 @@ export async function onRequest(context) {
 
   
 
-                                <div class="${baseCardClass} ${frostedClass} ${cardStyleClass} card-anim-enter" ${animStyle} data-id="${site.id}" data-name="${escapeHTML(site.name)}" data-url="${escapeHTML(normalizedUrl)}" data-catalog-id="${escapeHTML(String(site.catelog_id ?? ''))}" data-catalog="${escapeHTML(site.catelog_name || site.catelog || '鏈垎绫?)}" data-desc="${safeDesc}">
+                                <div class="${baseCardClass} ${frostedClass} ${cardStyleClass} card-anim-enter" ${animStyle} data-id="${site.id}" data-name="${escapeHTML(site.name)}" data-url="${escapeHTML(normalizedUrl)}" data-catalog-id="${escapeHTML(String(site.catelog_id ?? ''))}" data-catalog="${escapeHTML(site.catelog_name || site.catelog || 'Uncategorized')}" data-desc="${safeDesc}">
 
   
 
@@ -811,8 +811,10 @@ export async function onRequest(context) {
     }).join('');
 
   if (sites.length === 0) {
-      const emptyStateText = categories.length === 0 ? '娆㈣繋浣跨敤 iori-nav' : '鏆傛棤涔︾';
-      const emptyStateSub = categories.length === 0 ? '椤圭洰鍒濆鍖栧畬鎴愶紝璇峰墠寰€鍚庡彴娣诲姞鍒嗙被鍜屼功绛俱€? : '璇ュ垎绫讳笅杩樻病鏈夋坊鍔犱换浣曚功绛俱€?;
+      const emptyStateText = categories.length === 0 ? 'Welcome to iori-nav' : 'No bookmarks yet';
+      const emptyStateSub = categories.length === 0
+        ? 'Initialization complete. Add categories and bookmarks in admin.'
+        : 'There are no bookmarks in this category yet.';
       
       sitesGridMarkup = `
         <div class="col-span-full flex flex-col items-center justify-center py-24 text-center animate-fade-in">
@@ -851,8 +853,8 @@ export async function onRequest(context) {
   const datalistOptions = categories.map((cat) => `<option value="${escapeHTML(cat.catelog)}">`).join('');
   
   const headingPlainText = currentCatalogName
-    ? `${currentCatalogName} 路 ${sites.length} 涓功绛綻
-    : `鍏ㄩ儴鏀惰棌 路 ${sites.length} 涓功绛綻;
+    ? `${currentCatalogName} · ${sites.length} bookmarks`
+    : `All bookmarks · ${sites.length} bookmarks`;
   const headingText = escapeHTML(headingPlainText);
   const headingDefaultAttr = escapeHTML(headingPlainText);
   const headingActiveAttr = catalogExists ? escapeHTML(currentCatalogName) : '';
