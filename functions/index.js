@@ -1,4 +1,4 @@
-﻿// functions/index.js
+// functions/index.js
 import { isAdminAuthenticated } from './_middleware';
 import { FONT_MAP, SCHEMA_VERSION } from './constants';
 
@@ -538,7 +538,7 @@ export async function onRequest(context) {
                       const rawName = site.name || 'Untitled';
                   const rawCatalog = site.catelog_name || 'Uncategorized';
 
-      const rawDesc = site.desc || '鏆傛棤鎻忚堪';
+      const rawDesc = site.desc || '暂无描述';
 
       const normalizedUrl = sanitizeUrl(site.url);
 
@@ -618,11 +618,11 @@ export async function onRequest(context) {
 
   
 
-                      ${layoutGridCols >= '5' ? '' : '<span class="copy-text">澶嶅埗</span>'}
+                      ${layoutGridCols >= '5' ? '' : '<span class="copy-text">复制</span>'}
 
   
 
-                      <span class="copy-success hidden absolute -top-8 right-0 bg-accent-500 text-white text-xs px-2 py-1 rounded shadow-md">宸插鍒?</span>
+                      <span class="copy-success hidden absolute -top-8 right-0 bg-accent-500 text-white text-xs px-2 py-1 rounded shadow-md">已复制</span>
 
   
 
@@ -889,10 +889,10 @@ export async function onRequest(context) {
   const horizontalSubtitleHtml = layoutHideSubtitle ? '' : `<p class="${subTextColorClass} opacity-90 text-sm md:text-base" ${subtitleStyle}>{{SITE_DESCRIPTION}}</p>`;
 
   const searchPlaceholderMap = {
-    local: '鎼滅储涔︾...',
-    google: 'Google 鎼滅储...',
-    baidu: '鐧惧害鎼滅储...',
-    bing: 'Bing 鎼滅储...'
+    local: '搜索书签...',
+    google: 'Google 搜索...',
+    baidu: '百度搜索...',
+    bing: 'Bing 搜索...'
   };
   const searchInputPlaceholder = searchPlaceholderMap[homeSearchEngineProvider] || searchPlaceholderMap.local;
 

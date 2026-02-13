@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>涔︾绠＄悊椤甸潰</title>
+    <title>书签管理页面</title>
     <link rel="icon" href="/favicon.svg?v=148aafdf" type="image/svg+xml">
     <link rel="stylesheet" href="/css/admin.css?v=42740998" />
     <link rel="stylesheet" href="/css/admin-dropdown.css?v=a8270a59" />
@@ -17,19 +17,20 @@
     <div class="container">
       <header class="admin-header">
         <div>
-          <h1>涔︾绠＄悊</h1>
+          <h1>书签管理</h1>
           <p class="admin-subtitle">
-            绠＄悊鍚庡彴浠呴檺鍙椾俊浠荤殑绠＄悊鍛樹娇鐢紝璇峰Ε鍠勪繚绠¤处鍙?          </p>
+            管理后台仅限受信任的管理员使用，请妥善保管账号
+          </p>
         </div>
         <div class="header-actions">
-            <button id="refreshCacheBtn" class="refresh-btn" title="鎵嬪姩鍒锋柊棣栭〉缂撳瓨">
+            <button id="refreshCacheBtn" class="refresh-btn" title="手动刷新首页缓存">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                鍒锋柊缂撳瓨
+                刷新缓存
             </button>
             <form method="post" action="/admin/logout" style="margin: 0;">
-              <button type="submit" class="logout-btn">閫€鍑虹櫥褰?/button>
+              <button type="submit" class="logout-btn">退出登录</button>
             </form>
         </div>
       </header>
@@ -45,7 +46,7 @@
           readonly
           onfocus="this.removeAttribute('readonly');"
           class="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow h-[42px]"
-          placeholder="鎼滅储涔︾(鍚嶇О, URL, 鍒嗙被)"
+          placeholder="搜索书签(名称, URL, 分类)"
         />
         <input
           type="file"
@@ -54,32 +55,32 @@
           style="display: none"
         />
         <div class="flex flex-wrap gap-2 items-center">
-            <button id="batchBtn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors shadow-sm font-medium text-sm h-[42px] whitespace-nowrap">鎵归噺绠＄悊</button>
-            <button id="importBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm h-[42px] whitespace-nowrap">瀵煎叆</button>
-            <button id="exportBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm h-[42px] whitespace-nowrap">瀵煎嚭</button>
+            <button id="batchBtn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors shadow-sm font-medium text-sm h-[42px] whitespace-nowrap">批量管理</button>
+            <button id="importBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm h-[42px] whitespace-nowrap">导入</button>
+            <button id="exportBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm h-[42px] whitespace-nowrap">导出</button>
             <button id="addCategoryBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm font-medium text-sm flex items-center gap-1 h-[42px] whitespace-nowrap">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                鏂板鍒嗙被
+                新增分类
             </button>
             <button id="addBookmarkBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm flex items-center gap-1 h-[42px] whitespace-nowrap">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                鏂板涔︾
+                新增书签
             </button>
-            <button id="settingsBtn" class="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 transition-colors shadow-sm font-medium text-sm h-[42px] whitespace-nowrap">璁剧疆</button>
+            <button id="settingsBtn" class="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 transition-colors shadow-sm font-medium text-sm h-[42px] whitespace-nowrap">设置</button>
         </div>
       </div>
 
-      <!-- 瀵煎嚭閫夐」妯℃€佹 -->
+      <!-- 导出选项模态框 -->
       <div id="exportModal" class="modal" style="display: none">
         <div class="modal-content">
-          <span class="modal-close" id="closeExportModal">脳</span>
-          <h2>瀵煎嚭閫夐」</h2>
+          <span class="modal-close" id="closeExportModal">×</span>
+          <h2>导出选项</h2>
           <div class="p-4">
-              <p class="text-sm text-gray-600 mb-4">璇烽€夋嫨瀵煎嚭鏁版嵁鐨勫寘鍚寖鍥达細</p>
+              <p class="text-sm text-gray-600 mb-4">请选择导出数据的包含范围：</p>
               <div class="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-100">
                   <div class="flex flex-col">
-                      <span class="text-gray-700 font-medium text-sm">鍖呭惈绉佸瘑鏁版嵁</span>
-                      <span class="text-gray-400 text-xs mt-1">鍚屾椂涔熷寘鍚瀵嗗垎绫讳笅鐨勪功绛?/span>
+                      <span class="text-gray-700 font-medium text-sm">包含私密数据</span>
+                      <span class="text-gray-400 text-xs mt-1">同时也包含私密分类下的书签</span>
                   </div>
                   <label class="switch">
                       <input type="checkbox" id="exportIncludePrivate">
@@ -88,155 +89,155 @@
               </div>
           </div>
           <div class="flex justify-end gap-3 mt-4">
-            <button id="cancelExportBtn" class="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm">鍙栨秷</button>
-            <button id="confirmExportBtn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">纭瀵煎嚭</button>
+            <button id="cancelExportBtn" class="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm">取消</button>
+            <button id="confirmExportBtn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">确认导出</button>
           </div>
         </div>
       </div>
 
-      <!-- 鍒犻櫎纭妯℃€佹 -->
+      <!-- 删除确认模态框 -->
       <div id="deleteConfirmModal" class="modal" style="display: none">
         <div class="modal-content">
-          <span class="modal-close" id="closeDeleteConfirmModal">脳</span>
-          <h2>纭鍒犻櫎</h2>
+          <span class="modal-close" id="closeDeleteConfirmModal">×</span>
+          <h2>确认删除</h2>
           <div class="p-4">
-              <p class="text-gray-700 font-medium text-base mb-2">纭畾瑕佸垹闄よ涔︾鍚楋紵</p>
-              <p class="text-gray-500 text-sm">姝ゆ搷浣滄棤娉曟挙閿€锛岃璋ㄦ厧鎿嶄綔銆?/p>
+              <p class="text-gray-700 font-medium text-base mb-2">确定要删除该书签吗？</p>
+              <p class="text-gray-500 text-sm">此操作无法撤销，请谨慎操作。</p>
           </div>
           <div class="flex justify-end gap-3 mt-4">
-            <button id="cancelDeleteBtn" class="w-24 h-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">鍙栨秷</button>
-            <button id="confirmDeleteBtn" class="w-24 h-10 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium shadow-sm transition-colors">鍒犻櫎</button>
+            <button id="cancelDeleteBtn" class="w-24 h-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">取消</button>
+            <button id="confirmDeleteBtn" class="w-24 h-10 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium shadow-sm transition-colors">删除</button>
           </div>
         </div>
       </div>
 
-      <!-- 鍒锋柊缂撳瓨纭妯℃€佹 -->
+      <!-- 刷新缓存确认模态框 -->
       <div id="refreshCacheModal" class="modal" style="display: none">
         <div class="modal-content">
-          <span class="modal-close" id="closeRefreshCacheModal">脳</span>
-          <h2>鍒锋柊缂撳瓨</h2>
+          <span class="modal-close" id="closeRefreshCacheModal">×</span>
+          <h2>刷新缓存</h2>
           <div class="p-4">
-              <p class="text-gray-700 font-medium text-base mb-2">纭畾瑕佹墜鍔ㄥ埛鏂伴椤电紦瀛樺悧锛?/p>
-              <p class="text-gray-500 text-sm">閫氬父鎯呭喌涓嬶紝鏁版嵁鏇存柊浼氳嚜鍔ㄥ埛鏂扮紦瀛橈紝鏃犻渶鎵嬪姩鎿嶄綔銆?/p>
+              <p class="text-gray-700 font-medium text-base mb-2">确定要手动刷新首页缓存吗？</p>
+              <p class="text-gray-500 text-sm">通常情况下，数据更新会自动刷新缓存，无需手动操作。</p>
           </div>
           <div class="flex justify-end gap-3 mt-4">
-            <button id="cancelRefreshCacheBtn" class="w-24 h-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">鍙栨秷</button>
-            <button id="confirmRefreshCacheBtn" class="w-24 h-10 flex items-center justify-center bg-orange-600 text-white rounded hover:bg-orange-700 text-sm font-medium shadow-sm transition-colors" style="background-color: #ea580c; color: white;">纭鍒锋柊</button>
+            <button id="cancelRefreshCacheBtn" class="w-24 h-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">取消</button>
+            <button id="confirmRefreshCacheBtn" class="w-24 h-10 flex items-center justify-center bg-orange-600 text-white rounded hover:bg-orange-700 text-sm font-medium shadow-sm transition-colors" style="background-color: #ea580c; color: white;">确认刷新</button>
           </div>
         </div>
       </div>
 
-      <!-- 鎵归噺鍒犻櫎纭妯℃€佹 -->
+      <!-- 批量删除确认模态框 -->
       <div id="batchDeleteConfirmModal" class="modal" style="display: none; z-index: 2000;">
         <div class="modal-content" style="max-width: 400px;">
-          <span class="modal-close" id="closeBatchDeleteConfirmModal">脳</span>
-          <h2>鎵归噺鍒犻櫎纭</h2>
+          <span class="modal-close" id="closeBatchDeleteConfirmModal">×</span>
+          <h2>批量删除确认</h2>
           <div class="p-4">
-              <p id="batchDeleteConfirmText" class="text-gray-700 font-medium text-base mb-2">纭畾瑕佸垹闄ら€変腑鐨勪功绛惧悧锛?/p>
-              <p class="text-gray-500 text-sm">姝ゆ搷浣滄棤娉曟挙閿€锛岃璋ㄦ厧鎿嶄綔銆?/p>
+              <p id="batchDeleteConfirmText" class="text-gray-700 font-medium text-base mb-2">确定要删除选中的书签吗？</p>
+              <p class="text-gray-500 text-sm">此操作无法撤销，请谨慎操作。</p>
           </div>
           <div class="flex justify-end gap-3 mt-4">
-            <button id="cancelBatchDeleteBtn" class="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">鍙栨秷</button>
-            <button id="confirmBatchDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium shadow-sm transition-colors">鍒犻櫎</button>
+            <button id="cancelBatchDeleteBtn" class="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">取消</button>
+            <button id="confirmBatchDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium shadow-sm transition-colors">删除</button>
           </div>
         </div>
       </div>
 
-      <!-- 鍒嗙被鍒犻櫎纭妯℃€佹 -->
+      <!-- 分类删除确认模态框 -->
       <div id="deleteCategoryConfirmModal" class="modal" style="display: none">
         <div class="modal-content" style="max-width: 400px;">
-          <span class="modal-close" id="closeDeleteCategoryConfirmModal">脳</span>
-          <h2>纭鍒犻櫎鍒嗙被</h2>
+          <span class="modal-close" id="closeDeleteCategoryConfirmModal">×</span>
+          <h2>确认删除分类</h2>
           <div class="p-4">
-              <p class="text-gray-700 font-medium text-base mb-2">纭畾瑕佸垹闄よ鍒嗙被鍚楋紵</p>
-              <p class="text-gray-500 text-sm">姝ゆ搷浣滄棤娉曟挙閿€锛岃璋ㄦ厧鎿嶄綔銆?/p>
+              <p class="text-gray-700 font-medium text-base mb-2">确定要删除该分类吗？</p>
+              <p class="text-gray-500 text-sm">此操作无法撤销，请谨慎操作。</p>
           </div>
           <div class="flex justify-end gap-3 mt-4">
-            <button id="cancelDeleteCategoryBtn" class="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">鍙栨秷</button>
-            <button id="confirmDeleteCategoryBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium shadow-sm transition-colors">鍒犻櫎</button>
+            <button id="cancelDeleteCategoryBtn" class="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">取消</button>
+            <button id="confirmDeleteCategoryBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium shadow-sm transition-colors">删除</button>
           </div>
         </div>
       </div>
 
-      <!-- 鏂板鍒嗙被妯℃€佹 -->
+      <!-- 新增分类模态框 -->
       <div id="addCategoryModal" class="modal" style="display: none">
         <div class="modal-content">
-          <span class="modal-close" id="closeCategoryModal">脳</span>
-          <h2>鏂板鍒嗙被</h2>
+          <span class="modal-close" id="closeCategoryModal">×</span>
+          <h2>新增分类</h2>
           <form id="addCategoryForm">
             <div class="form-group">
-                <label for="newCategoryName">鍒嗙被鍚嶇О:</label>
+                <label for="newCategoryName">分类名称:</label>
                 <input type="text" id="newCategoryName" required />
             </div>
             <div class="form-group">
-                <label for="newCategoryParent">鐖剁骇鍒嗙被(鍙€?:</label>
+                <label for="newCategoryParent">父级分类(可选):</label>
                 <div id="newCategoryParentWrapper" class="custom-dropdown-wrapper"></div>
                 <input type="hidden" id="newCategoryParent" value="0">
             </div>
             <div class="form-group">
-                <label for="newCategorySortOrder">鎺掑簭鍊?鍙€?:</label>
-                <input type="number" id="newCategorySortOrder" placeholder="榛樿9999" />
+                <label for="newCategorySortOrder">排序值(可选):</label>
+                <input type="number" id="newCategorySortOrder" placeholder="默认9999" />
             </div>
             <div class="form-group flex items-center justify-between mt-2 mb-4">
-              <label for="newCategoryIsPrivate" class="cursor-pointer select-none text-gray-700 font-medium">绉佸瘑鍒嗙被:</label>
+              <label for="newCategoryIsPrivate" class="cursor-pointer select-none text-gray-700 font-medium">私密分类:</label>
               <label class="switch">
                   <input type="checkbox" id="newCategoryIsPrivate">
                   <span class="slider round"></span>
               </label>
             </div>
             <div class="flex flex-row justify-end gap-3 mt-6">
-              <button type="button" id="cancelAddCategoryBtn" class="w-24 h-10 m-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">鍙栨秷</button>
-              <button type="submit" class="w-24 h-10 !mt-0 m-0 flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors">淇濆瓨</button>
+              <button type="button" id="cancelAddCategoryBtn" class="w-24 h-10 m-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">取消</button>
+              <button type="submit" class="w-24 h-10 !mt-0 m-0 flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors">保存</button>
             </div>
           </form>
         </div>
       </div>
 
 
-       <!-- 缂栬緫鍒嗙被妯℃€佹 -->
+       <!-- 编辑分类模态框 -->
       <div id="editCategoryModal" class="modal" style="display: none">
         <div class="modal-content">
-          <span class="modal-close" id="closeEditCategoryModal">脳</span>
-          <h2>缂栬緫鍒嗙被</h2>
+          <span class="modal-close" id="closeEditCategoryModal">×</span>
+          <h2>编辑分类</h2>
           <form id="editCategoryForm">
             <input type="hidden" name="id" id="editCategoryId" />
             <div class="form-group">
-                <label for="editCategoryName">鍒嗙被鍚嶇О:</label>
+                <label for="editCategoryName">分类名称:</label>
                 <input type="text" id="editCategoryName" required />
             </div>
             <div class="form-group">
-                <label for="editCategoryParent">鐖剁骇鍒嗙被(鍙€?:</label>
+                <label for="editCategoryParent">父级分类(可选):</label>
                 <div id="editCategoryParentWrapper" class="custom-dropdown-wrapper"></div>
                 <input type="hidden" id="editCategoryParent" value="0">
             </div>
             <div class="form-group">
-                <label for="editCategorySortOrder">鎺掑簭鍊?鍙€?:</label>
+                <label for="editCategorySortOrder">排序值(可选):</label>
                 <input type="number" id="editCategorySortOrder" />
             </div>
             <div class="form-group flex items-center justify-between mt-2 mb-4">
-              <label for="editCategoryIsPrivate" class="cursor-pointer select-none text-gray-700 font-medium">绉佸瘑鍒嗙被:</label>
+              <label for="editCategoryIsPrivate" class="cursor-pointer select-none text-gray-700 font-medium">私密分类:</label>
               <label class="switch">
                   <input type="checkbox" id="editCategoryIsPrivate">
                   <span class="slider round"></span>
               </label>
             </div>
             <div class="flex flex-row justify-end gap-3 mt-6">
-              <button type="button" id="cancelEditCategoryBtn" class="w-24 h-10 m-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">鍙栨秷</button>
-              <button type="submit" class="w-24 h-10 !mt-0 m-0 flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors">淇濆瓨</button>
+              <button type="button" id="cancelEditCategoryBtn" class="w-24 h-10 m-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">取消</button>
+              <button type="submit" class="w-24 h-10 !mt-0 m-0 flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors">保存</button>
             </div>
           </form>
         </div>
       </div>
 
 
-      <!-- 鏂板涔︾妯℃€佹 -->
+      <!-- 新增书签模态框 -->
       <div id="addBookmarkModal" class="modal" style="display: none">
         <div class="modal-content">
-          <span class="modal-close" id="closeBookmarkModal">脳</span>
-          <h2>鏂板涔︾</h2>
+          <span class="modal-close" id="closeBookmarkModal">×</span>
+          <h2>新增书签</h2>
           <form id="addBookmarkForm">
             <div class="form-group">
-              <label for="addBookmarkName">鍚嶇О:</label>
+              <label for="addBookmarkName">名称:</label>
               <input type="text" id="addBookmarkName" required />
             </div>
             <div class="form-group">
@@ -244,23 +245,23 @@
               <input type="text" id="addBookmarkUrl" required />
             </div>
             <div class="form-group">
-              <label for="addBookmarkLogo">Logo(鍙€?:</label>
-              <input type="text" id="addBookmarkLogo" placeholder="榛樿鑷姩鏍规嵁url鑾峰彇"/>
+              <label for="addBookmarkLogo">Logo(可选):</label>
+              <input type="text" id="addBookmarkLogo" placeholder="默认自动根据url获取"/>
             </div>
             <div class="form-group">
-              <label for="addBookmarkDesc">鎻忚堪(鍙€?:</label>
+              <label for="addBookmarkDesc">描述(可选):</label>
               <input type="text" id="addBookmarkDesc" />
-              <button type="button" id="addBookmarkAiBtn" class="ai-generate-btn" title="AI 鐢熸垚鎻忚堪">
+              <button type="button" id="addBookmarkAiBtn" class="ai-generate-btn" title="AI 生成描述">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
               </button>
             </div>
             <div class="form-group">
-              <label for="addBookmarkCatelog">鍒嗙被:</label>
+              <label for="addBookmarkCatelog">分类:</label>
               <div id="addBookmarkCatelogWrapper" class="custom-dropdown-wrapper w-full"></div>
               <input type="hidden" id="addBookmarkCatelog" required>
             </div>
             <div class="form-group">
-              <label for="addBookmarkSortOrder">鎺掑簭鍊?鍙€?:</label>
+              <label for="addBookmarkSortOrder">排序值(可选):</label>
               <input
                 type="number"
                 id="addBookmarkSortOrder"
@@ -268,29 +269,29 @@
               />
             </div>
             <div class="form-group flex items-center justify-between">
-              <label for="addBookmarkIsPrivate" class="cursor-pointer select-none text-gray-700 font-medium">绉佸瘑涔︾:</label>
+              <label for="addBookmarkIsPrivate" class="cursor-pointer select-none text-gray-700 font-medium">私密书签:</label>
               <label class="switch">
                   <input type="checkbox" id="addBookmarkIsPrivate">
                   <span class="slider round"></span>
               </label>
             </div>
             <div class="flex flex-row justify-end gap-3 mt-6">
-              <button type="button" id="cancelAddBookmarkBtn" class="w-24 h-10 m-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">鍙栨秷</button>
-              <button type="submit" class="w-24 h-10 !mt-0 m-0 flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors">淇濆瓨</button>
+              <button type="button" id="cancelAddBookmarkBtn" class="w-24 h-10 m-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">取消</button>
+              <button type="submit" class="w-24 h-10 !mt-0 m-0 flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors">保存</button>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- 缂栬緫涔︾妯℃€佹 -->
+      <!-- 编辑书签模态框 -->
       <div id="editBookmarkModal" class="modal" style="display: none">
         <div class="modal-content">
-          <span class="modal-close" id="closeEditBookmarkModal">脳</span>
-          <h2>缂栬緫涔︾</h2>
+          <span class="modal-close" id="closeEditBookmarkModal">×</span>
+          <h2>编辑书签</h2>
           <form id="editBookmarkForm">
             <input type="hidden" name="id" id="editBookmarkId" />
             <div class="form-group">
-              <label for="editBookmarkName">鍚嶇О:</label>
+              <label for="editBookmarkName">名称:</label>
               <input type="text" name="name" id="editBookmarkName" required />
             </div>
             <div class="form-group">
@@ -298,23 +299,23 @@
               <input type="text" name="url" id="editBookmarkUrl" required />
             </div>
             <div class="form-group">
-              <label for="editBookmarkLogo">Logo(鍙€?:</label>
-              <input type="text" name="logo" id="editBookmarkLogo" placeholder="榛樿鑷姩鏍规嵁url鑾峰彇"/>
+              <label for="editBookmarkLogo">Logo(可选):</label>
+              <input type="text" name="logo" id="editBookmarkLogo" placeholder="默认自动根据url获取"/>
             </div>
             <div class="form-group">
-              <label for="editBookmarkDesc">鎻忚堪(鍙€?:</label>
+              <label for="editBookmarkDesc">描述(可选):</label>
               <input type="text" name="desc" id="editBookmarkDesc" />
-              <button type="button" id="editBookmarkAiBtn" class="ai-generate-btn" title="AI 鐢熸垚鎻忚堪">
+              <button type="button" id="editBookmarkAiBtn" class="ai-generate-btn" title="AI 生成描述">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
               </button>
             </div>
             <div class="form-group">
-              <label for="editBookmarkCatelog">鍒嗙被:</label>
+              <label for="editBookmarkCatelog">分类:</label>
               <div id="editBookmarkCatelogWrapper" class="custom-dropdown-wrapper w-full"></div>
               <input type="hidden" id="editBookmarkCatelog" name="catelog_id" required>
             </div>
             <div class="form-group">
-              <label for="editBookmarkSortOrder">鎺掑簭鍊?鍙€?:</label>
+              <label for="editBookmarkSortOrder">排序值(可选):</label>
               <input
                 type="number"
                 name="sort_order"
@@ -323,64 +324,63 @@
               />
             </div>
             <div class="form-group flex items-center justify-between">
-              <label for="editBookmarkIsPrivate" class="cursor-pointer select-none text-gray-700 font-medium">绉佸瘑涔︾:</label>
+              <label for="editBookmarkIsPrivate" class="cursor-pointer select-none text-gray-700 font-medium">私密书签:</label>
               <label class="switch">
                   <input type="checkbox" name="is_private" id="editBookmarkIsPrivate">
                   <span class="slider round"></span>
               </label>
             </div>
             <div class="flex flex-row justify-end gap-3 mt-6">
-              <button type="button" id="cancelEditBookmarkBtn" class="w-24 h-10 m-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">鍙栨秷</button>
-              <button type="submit" class="w-24 h-10 !mt-0 m-0 flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors">淇濆瓨</button>
+              <button type="button" id="cancelEditBookmarkBtn" class="w-24 h-10 m-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-sm font-medium transition-colors">取消</button>
+              <button type="submit" class="w-24 h-10 !mt-0 m-0 flex items-center justify-center bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors">保存</button>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- 璁剧疆妯℃€佹 -->
+      <!-- 设置模态框 -->
       <div id="settingsModal" class="modal settings-modal" style="display: none;">
         <div class="modal-content-wrapper">
           <div class="modal-header">
-            <h3 class="modal-title"><span>鈿欙笍</span> 绯荤粺璁剧疆</h3>
-            <button id="closeSettingsModal" class="modal-close-btn">脳</button>
+            <h3 class="modal-title"><span>⚙️</span> 系统设置</h3>
+            <button id="closeSettingsModal" class="modal-close-btn">×</button>
           </div>
 
           <div class="modal-body">
             <div class="settings-tabs">
-                <button class="settings-tab-btn active" data-tab="home-settings">棣栭〉璁剧疆</button>
-                <button class="settings-tab-btn" data-tab="layout-settings">鍗＄墖璁剧疆</button>
-                <button class="settings-tab-btn" data-tab="wallpaper-settings">澹佺焊璁剧疆</button>
-                <button class="settings-tab-btn" data-tab="ai-settings">AI 璁剧疆</button>
+                <button class="settings-tab-btn active" data-tab="home-settings">首页设置</button>
+                <button class="settings-tab-btn" data-tab="layout-settings">卡片设置</button>
+                <button class="settings-tab-btn" data-tab="wallpaper-settings">壁纸设置</button>
+                <button class="settings-tab-btn" data-tab="ai-settings">AI 设置</button>
             </div>
 
-             <!-- 棣栭〉璁剧疆鍐呭 -->
+             <!-- 首页设置内容 -->
             <div id="home-settings" class="settings-tab-content active">
                 <div class="p-3 bg-gray-50 rounded border border-gray-100 mb-3">
-                    <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">绔欑偣淇℃伅</h4>
+                    <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">站点信息</h4>
                     <div class="space-y-3">
                         <div>
-                            <label for="homeSiteName" class="text-xs text-gray-500 block mb-1">绔欑偣鍚嶇О (浼樺厛浜庣幆澧冨彉閲?</label>
-                            <input type="text" id="homeSiteName" placeholder="渚嬪锛氭垜鐨勫鑸? class="w-full text-sm p-2 border rounded">
+                            <label for="homeSiteName" class="text-xs text-gray-500 block mb-1">站点名称 (优先于环境变量)</label>
+                            <input type="text" id="homeSiteName" placeholder="例如：我的导航" class="w-full text-sm p-2 border rounded">
                         </div>
                         <div>
-                            <label for="homeSiteDescription" class="text-xs text-gray-500 block mb-1">绔欑偣鎻忚堪 (浼樺厛浜庣幆澧冨彉閲?</label>
-                            <textarea id="homeSiteDescription" placeholder="璇疯緭鍏ョ珯鐐规弿杩?.." class="w-full text-sm p-2 border rounded" rows="2"></textarea>
+                            <label for="homeSiteDescription" class="text-xs text-gray-500 block mb-1">站点描述 (优先于环境变量)</label>
+                            <textarea id="homeSiteDescription" placeholder="请输入站点描述..." class="w-full text-sm p-2 border rounded" rows="2"></textarea>
                         </div>
                     </div>
                 </div>
 
-
                 <div class="p-3 bg-gray-50 rounded border border-gray-100 mb-3">
-                    <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">鍔熻兘鍥炬爣</h4>
+                    <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">功能图标</h4>
                     <div class="flex items-center justify-between mb-2">
-                        <label for="hideGithubSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">闅愯棌 GitHub 鍥炬爣</label>
+                        <label for="hideGithubSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">隐藏 GitHub 图标</label>
                         <label class="switch scale-75 origin-right">
                             <input type="checkbox" id="hideGithubSwitch">
                             <span class="slider round"></span>
                         </label>
                     </div>
                     <div class="flex items-center justify-between">
-                        <label for="hideAdminSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">闅愯棌绠＄悊鍚庡彴鍥炬爣</label>
+                        <label for="hideAdminSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">隐藏管理后台图标</label>
                         <label class="switch scale-75 origin-right">
                             <input type="checkbox" id="hideAdminSwitch">
                             <span class="slider round"></span>
@@ -390,45 +390,45 @@
 
                 <div class="form-group-stack" style="margin-top: 1rem;">
                     <div class="p-3 bg-gray-50 rounded border border-gray-100 mb-3">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">鎼滅储寮曟搸</h4>
+                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">搜索引擎</h4>
                         <div>
-                            <label for="searchEngineProvider" class="text-xs text-gray-500 block mb-1">棣栭〉鎼滅储妯″紡</label>
+                            <label for="searchEngineProvider" class="text-xs text-gray-500 block mb-1">首页搜索模式</label>
                             <select id="searchEngineProvider" class="w-full text-sm p-2 border rounded bg-white">
-                                <option value="local">绔欏唴鎼滅储锛堥粯璁わ級</option>
+                                <option value="local">站内搜索（默认）</option>
                                 <option value="google">Google</option>
                                 <option value="baidu">Baidu</option>
                                 <option value="bing">Bing</option>
                             </select>
-                            <p class="text-xs text-gray-400 mt-2">璁剧疆鍚庯紝棣栭〉鎼滅储妗嗗皢鐩存帴浣跨敤閫夊畾寮曟搸銆?/p>
+                            <p class="text-xs text-gray-400 mt-2">设置后，首页搜索框将直接使用选定引擎。</p>
                         </div>
                     </div>
                     <div class="p-3 bg-gray-50 rounded border border-gray-100 mb-3">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">涓婚妯″紡</h4>
+                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">主题模式</h4>
                         <div class="mb-3">
-                            <label for="homeThemeMode" class="text-xs text-gray-500 block mb-1">棣栭〉涓婚鍒濆妯″紡</label>
+                            <label for="homeThemeMode" class="text-xs text-gray-500 block mb-1">首页主题初始模式</label>
                             <select id="homeThemeMode" class="w-full text-sm p-2 border rounded bg-white">
-                                <option value="auto">鑷姩锛堟寜鏃堕棿鍒囨崲锛?/option>
-                                <option value="manual">鎵嬪姩锛堢敤鎴峰弻鍑诲彲鎭㈠鑷姩锛?/option>
+                                <option value="auto">自动（按时间切换）</option>
+                                <option value="manual">手动（用户双击可恢复自动）</option>
                             </select>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label for="homeThemeDarkStartHour" class="text-xs text-gray-500 block mb-1">榛戞殫寮€濮嬫椂 (0-23)</label>
+                                <label for="homeThemeDarkStartHour" class="text-xs text-gray-500 block mb-1">黑暗开始时 (0-23)</label>
                                 <input type="number" id="homeThemeDarkStartHour" min="0" max="23" step="1" class="w-full text-sm p-2 border rounded bg-white" placeholder="19">
                             </div>
                             <div>
-                                <label for="homeThemeDarkEndHour" class="text-xs text-gray-500 block mb-1">榛戞殫缁撴潫鏃?(0-23)</label>
+                                <label for="homeThemeDarkEndHour" class="text-xs text-gray-500 block mb-1">黑暗结束时 (0-23)</label>
                                 <input type="number" id="homeThemeDarkEndHour" min="0" max="23" step="1" class="w-full text-sm p-2 border rounded bg-white" placeholder="7">
                             </div>
                         </div>
                     </div>
 
-                    <!-- 鏍囬璁剧疆 -->
+                    <!-- 标题设置 -->
                     <div class="p-3 bg-gray-50 rounded border border-gray-100">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">鍚嶇О涓庢弿杩版牱寮?(Style)</h4>
+                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">名称与描述样式 (Style)</h4>
                         
                         <div class="flex items-center justify-between mb-2">
-                            <label for="hideTitleSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">闅愯棌绔欑偣鍚嶇О</label>
+                            <label for="hideTitleSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">隐藏站点名称</label>
                             <label class="switch scale-75 origin-right">
                                 <input type="checkbox" id="hideTitleSwitch">
                                 <span class="slider round"></span>
@@ -436,15 +436,15 @@
                         </div>
                         <div class="flex gap-2 mb-4 items-end">
                              <div class="flex-[2]">
-                                <label class="text-xs text-gray-500 block mb-1">鍚嶇О瀛椾綋</label>
+                                <label class="text-xs text-gray-500 block mb-1">名称字体</label>
                                 <select id="homeTitleFont" class="custom-select w-full text-sm p-1 border rounded h-[34px]"></select>
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">瀛椾綋澶у皬 (px)</label>
+                                <label class="text-xs text-gray-500 block mb-1">字体大小 (px)</label>
                                 <input type="number" id="homeTitleSize" placeholder="36" class="w-full text-sm p-1 border rounded h-[34px]">
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">棰滆壊</label>
+                                <label class="text-xs text-gray-500 block mb-1">颜色</label>
                                 <div class="flex gap-1 h-[34px]">
                                     <input type="color" id="homeTitleColorPicker" class="h-full w-8 cursor-pointer border-0 p-0 rounded overflow-hidden">
                                     <input type="text" id="homeTitleColor" placeholder="#ffffff" class="flex-1 text-sm p-1 border rounded h-full min-w-0">
@@ -453,7 +453,7 @@
                         </div>
 
                         <div class="flex items-center justify-between mb-2">
-                            <label for="hideSubtitleSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">闅愯棌绔欑偣鎻忚堪</label>
+                            <label for="hideSubtitleSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">隐藏站点描述</label>
                             <label class="switch scale-75 origin-right">
                                 <input type="checkbox" id="hideSubtitleSwitch">
                                 <span class="slider round"></span>
@@ -461,15 +461,15 @@
                         </div>
                         <div class="flex gap-2 mb-0 items-end">
                              <div class="flex-[2]">
-                                <label class="text-xs text-gray-500 block mb-1">鎻忚堪瀛椾綋</label>
+                                <label class="text-xs text-gray-500 block mb-1">描述字体</label>
                                 <select id="homeSubtitleFont" class="custom-select w-full text-sm p-1 border rounded h-[34px]"></select>
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">瀛椾綋澶у皬 (px)</label>
+                                <label class="text-xs text-gray-500 block mb-1">字体大小 (px)</label>
                                 <input type="number" id="homeSubtitleSize" placeholder="16" class="w-full text-sm p-1 border rounded h-[34px]">
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">棰滆壊</label>
+                                <label class="text-xs text-gray-500 block mb-1">颜色</label>
                                 <div class="flex gap-1 h-[34px]">
                                     <input type="color" id="homeSubtitleColorPicker" class="h-full w-8 cursor-pointer border-0 p-0 rounded overflow-hidden">
                                     <input type="text" id="homeSubtitleColor" placeholder="#e1e7f1" class="flex-1 text-sm p-1 border rounded h-full min-w-0">
@@ -478,12 +478,12 @@
                         </div>
                     </div>
 
-                    <!-- 缁熻淇℃伅璁剧疆 -->
+                    <!-- 统计信息设置 -->
                     <div class="p-3 bg-gray-50 rounded border border-gray-100 mt-3">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">鍗＄墖缁熻 (鍒楄〃鏍囬)</h4>
+                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">卡片统计 (列表标题)</h4>
                         
                         <div class="flex items-center justify-between mb-2">
-                            <label for="hideStatsSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">闅愯棌缁熻</label>
+                            <label for="hideStatsSwitch" class="cursor-pointer select-none text-gray-700 font-medium text-sm">隐藏统计</label>
                             <label class="switch scale-75 origin-right">
                                 <input type="checkbox" id="hideStatsSwitch">
                                 <span class="slider round"></span>
@@ -491,15 +491,15 @@
                         </div>
                         <div class="flex gap-2 mb-0 items-end">
                              <div class="flex-[2]">
-                                <label class="text-xs text-gray-500 block mb-1">瀛椾綋 (鑷姩鍔犺浇璧勬簮)</label>
+                                <label class="text-xs text-gray-500 block mb-1">字体 (自动加载资源)</label>
                                 <select id="homeStatsFont" class="custom-select w-full text-sm p-1 border rounded h-[34px]"></select>
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">瀛椾綋澶у皬 (px)</label>
+                                <label class="text-xs text-gray-500 block mb-1">字体大小 (px)</label>
                                 <input type="number" id="homeStatsSize" placeholder="20" class="w-full text-sm p-1 border rounded h-[34px]">
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">棰滆壊</label>
+                                <label class="text-xs text-gray-500 block mb-1">颜色</label>
                                 <div class="flex gap-1 h-[34px]">
                                     <input type="color" id="homeStatsColorPicker" class="h-full w-8 cursor-pointer border-0 p-0 rounded overflow-hidden">
                                     <input type="text" id="homeStatsColor" placeholder="#1f2937" class="flex-1 text-sm p-1 border rounded h-full min-w-0">
@@ -511,37 +511,37 @@
 
                 </div>
             </div>
-            <!-- 甯冨眬璁剧疆鍐呭 -->
+            <!-- 布局设置内容 -->
             <div id="layout-settings" class="settings-tab-content">
              
 
                     <div class="p-2 hover:bg-gray-50 rounded">
-                         <label class="block text-gray-700 font-medium mb-2">鍗＄墖甯冨眬 (澶у睆涓€琛屾樉绀?</label>
+                         <label class="block text-gray-700 font-medium mb-2">卡片布局 (大屏一行显示)</label>
                          <div class="flex gap-4">
                              <label class="inline-flex items-center cursor-pointer">
                                  <input type="radio" name="gridCols" value="4" class="form-radio text-primary-600">
-                                 <span class="ml-2">4 鍒?/span>
+                                 <span class="ml-2">4 列</span>
                              </label>
                              <label class="inline-flex items-center cursor-pointer">
                                  <input type="radio" name="gridCols" value="5" class="form-radio text-primary-600">
-                                 <span class="ml-2">5 鍒?/span>
+                                 <span class="ml-2">5 列</span>
                              </label>
                              <label class="inline-flex items-center cursor-pointer">
                                  <input type="radio" name="gridCols" value="6" class="form-radio text-primary-600">
-                                 <span class="ml-2">6 鍒?/span>
+                                 <span class="ml-2">6 列</span>
                              </label>
                              <label class="inline-flex items-center cursor-pointer">
                                  <input type="radio" name="gridCols" value="7" class="form-radio text-primary-600">
-                                 <span class="ml-2">7 鍒?/span>
+                                 <span class="ml-2">7 列</span>
                              </label>
                          </div>
                     </div>
                     <div class="p-2 hover:bg-gray-50 rounded">
                          <div class="flex items-center mb-4">
-                             <label class="block text-gray-700 font-medium mr-4">鍗＄墖椋庢牸</label>
+                             <label class="block text-gray-700 font-medium mr-4">卡片风格</label>
                              <div class="flex bg-gray-200 rounded p-1">
-                                 <button type="button" id="btnStyle1" class="card-style-btn px-4 py-1 text-sm rounded transition-all bg-white shadow-sm text-gray-800 font-medium" data-style="style1">椋庢牸涓€</button>
-                                 <button type="button" id="btnStyle2" class="card-style-btn px-4 py-1 text-sm rounded transition-all text-gray-600 hover:text-gray-900" data-style="style2">椋庢牸浜?/button>
+                                 <button type="button" id="btnStyle1" class="card-style-btn px-4 py-1 text-sm rounded transition-all bg-white shadow-sm text-gray-800 font-medium" data-style="style1">风格一</button>
+                                 <button type="button" id="btnStyle2" class="card-style-btn px-4 py-1 text-sm rounded transition-all text-gray-600 hover:text-gray-900" data-style="style2">风格二</button>
                              </div>
                          </div>
                          
@@ -556,10 +556,10 @@
                                                  </div>
                                                  <div class="flex-1 min-w-0">
                                                      <h3 class="site-title text-base font-medium text-gray-900 truncate">Baidu</h3>
-                                                     <span class="preview-category inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">鎼滅储寮曟搸</span>
+                                                     <span class="preview-category inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">搜索引擎</span>
                                                  </div>
                                              </div>
-                                             <p class="preview-desc mt-2 text-sm text-gray-600 leading-relaxed line-clamp-2">鐧惧害鎼滅储寮曟搸锛屽揩閫熸煡鎵句俊鎭紝鎻愪緵澶氱鎼滅储鏈嶅姟銆傜櫨搴︽槸鍏ㄧ悆鏈€澶х殑涓枃鎼滅储寮曟搸銆佹渶澶х殑涓枃缃戠珯銆?/p>
+                                             <p class="preview-desc mt-2 text-sm text-gray-600 leading-relaxed line-clamp-2">百度搜索引擎，快速查找信息，提供多种搜索服务。百度是全球最大的中文搜索引擎、最大的中文网站。</p>
                                              <div class="preview-links mt-3 flex items-center justify-between">
                                                  <span class="text-xs text-blue-600 truncate max-w-[140px]">https://www.baidu.com</span>
                                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -580,10 +580,10 @@
                                                  </div>
                                                  <div class="w-full flex flex-col items-center">
                                                      <h3 class="site-title text-base font-medium text-gray-900 truncate w-full text-center">Baidu</h3>
-                                                     <span class="preview-category inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">鎼滅储寮曟搸</span>
+                                                     <span class="preview-category inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">搜索引擎</span>
                                                  </div>
                                              </div>
-                                             <p class="preview-desc mt-2 text-sm text-gray-600 leading-relaxed line-clamp-2 text-center">鐧惧害鎼滅储寮曟搸锛屽揩閫熸煡鎵句俊鎭紝鎻愪緵澶氱鎼滅储鏈嶅姟銆傜櫨搴︽槸鍏ㄧ悆鏈€澶х殑涓枃鎼滅储寮曟搸銆佹渶澶х殑涓枃缃戠珯銆?/p>
+                                             <p class="preview-desc mt-2 text-sm text-gray-600 leading-relaxed line-clamp-2 text-center">百度搜索引擎，快速查找信息，提供多种搜索服务。百度是全球最大的中文搜索引擎、最大的中文网站。</p>
                                              <div class="preview-links mt-3 flex items-center justify-between border-t border-gray-100 pt-2 w-full">
                                                  <span class="text-xs text-blue-600 truncate w-full text-center">https://www.baidu.com</span>
                                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -596,20 +596,20 @@
                          </div>
                     </div>
 
-                    <!-- 涔︾鏍囬鏍峰紡 -->
+                    <!-- 书签标题样式 -->
                     <div class="p-3 bg-gray-50 rounded border border-gray-100 mt-3">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">涔︾鏍囬鏍峰紡</h4>
+                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">书签标题样式</h4>
                         <div class="flex gap-2 mb-0 items-end">
                              <div class="flex-[2]">
-                                <label class="text-xs text-gray-500 block mb-1">瀛椾綋</label>
+                                <label class="text-xs text-gray-500 block mb-1">字体</label>
                                 <select id="cardTitleFont" class="custom-select w-full text-sm p-1 border rounded h-[34px]"></select>
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">澶у皬 (px)</label>
+                                <label class="text-xs text-gray-500 block mb-1">大小 (px)</label>
                                 <input type="number" id="cardTitleSize" placeholder="16" class="w-full text-sm p-1 border rounded h-[34px]">
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">棰滆壊</label>
+                                <label class="text-xs text-gray-500 block mb-1">颜色</label>
                                 <div class="flex gap-1 h-[34px]">
                                     <input type="color" id="cardTitleColorPicker" class="h-full w-8 cursor-pointer border-0 p-0 rounded overflow-hidden">
                                     <input type="text" id="cardTitleColor" placeholder="#111827" class="flex-1 text-sm p-1 border rounded h-full min-w-0">
@@ -618,20 +618,20 @@
                         </div>
                     </div>
 
-                    <!-- 鎻忚堪鏍峰紡 -->
+                    <!-- 描述样式 -->
                     <div class="p-3 bg-gray-50 rounded border border-gray-100 mt-3 mb-3">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">鎻忚堪鏍峰紡</h4>
+                        <h4 class="text-sm font-bold text-gray-700 mb-3 border-b border-gray-200 pb-1">描述样式</h4>
                         <div class="flex gap-2 mb-0 items-end">
                              <div class="flex-[2]">
-                                <label class="text-xs text-gray-500 block mb-1">瀛椾綋</label>
+                                <label class="text-xs text-gray-500 block mb-1">字体</label>
                                 <select id="cardDescFont" class="custom-select w-full text-sm p-1 border rounded h-[34px]"></select>
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">澶у皬 (px)</label>
+                                <label class="text-xs text-gray-500 block mb-1">大小 (px)</label>
                                 <input type="number" id="cardDescSize" placeholder="14" class="w-full text-sm p-1 border rounded h-[34px]">
                              </div>
                              <div class="flex-1">
-                                <label class="text-xs text-gray-500 block mb-1">棰滆壊</label>
+                                <label class="text-xs text-gray-500 block mb-1">颜色</label>
                                 <div class="flex gap-1 h-[34px]">
                                     <input type="color" id="cardDescColorPicker" class="h-full w-8 cursor-pointer border-0 p-0 rounded overflow-hidden">
                                     <input type="text" id="cardDescColor" placeholder="#4b5563" class="flex-1 text-sm p-1 border rounded h-full min-w-0">
@@ -641,23 +641,23 @@
                     </div>
 
                     <div class="p-2 hover:bg-gray-50 rounded" id="cardRadiusContainer">
-                         <label for="cardRadius" class="block text-gray-700 font-medium mb-1">鍗＄墖鍦嗚: <span id="cardRadiusValue">12</span>px</label>
+                         <label for="cardRadius" class="block text-gray-700 font-medium mb-1">卡片圆角: <span id="cardRadiusValue">12</span>px</label>
                          <input type="range" id="cardRadius" min="0" max="30" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                     </div>
 
                     <div class="p-2 hover:bg-gray-50 rounded" id="cardWidthContainer">
-                         <label for="cardWidth" class="text-xs text-gray-500 block mb-1">鍗＄墖瀹藉害</label>
+                         <label for="cardWidth" class="text-xs text-gray-500 block mb-1">卡片宽度</label>
                          <select id="cardWidth" class="w-full text-sm p-2 border rounded bg-white">
-                             <option value="100%">鑷€傚簲瀹藉害 (100%)</option>
-                             <option value="280px">灏?(280px)</option>
-                             <option value="320px">涓?(320px)</option>
-                             <option value="360px">澶?(360px)</option>
-                             <option value="400px">瓒呭ぇ (400px)</option>
+                             <option value="100%">自适应宽度 (100%)</option>
+                             <option value="280px">小 (280px)</option>
+                             <option value="320px">中 (320px)</option>
+                             <option value="360px">大 (360px)</option>
+                             <option value="400px">超大 (400px)</option>
                          </select>
                     </div>
 
                 <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                    <label for="hideCategorySwitch" class="cursor-pointer select-none text-gray-700 font-medium">闅愯棌鍒嗙被</label>
+                    <label for="hideCategorySwitch" class="cursor-pointer select-none text-gray-700 font-medium">隐藏分类</label>
                     <label class="switch">
                         <input type="checkbox" id="hideCategorySwitch">
                         <span class="slider round"></span>
@@ -665,7 +665,7 @@
                 </div>
                 <div class="form-group-stack" style="margin-top: 1rem;">
                     <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                        <label for="hideDescSwitch" class="cursor-pointer select-none text-gray-700 font-medium">闅愯棌鎻忚堪</label>
+                        <label for="hideDescSwitch" class="cursor-pointer select-none text-gray-700 font-medium">隐藏描述</label>
                         <label class="switch">
                             <input type="checkbox" id="hideDescSwitch">
                             <span class="slider round"></span>
@@ -673,7 +673,7 @@
                     </div>
 
                     <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                        <label for="hideLinksSwitch" class="cursor-pointer select-none text-gray-700 font-medium">闅愯棌閾炬帴琛?/label>
+                        <label for="hideLinksSwitch" class="cursor-pointer select-none text-gray-700 font-medium">隐藏链接行</label>
                         <label class="switch">
                             <input type="checkbox" id="hideLinksSwitch">
                             <span class="slider round"></span>
@@ -683,7 +683,7 @@
                     
 
                     <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                        <label for="frostedGlassSwitch" class="cursor-pointer select-none text-gray-700 font-medium">鍗＄墖姣涚幓鐠冩晥鏋?/label>
+                        <label for="frostedGlassSwitch" class="cursor-pointer select-none text-gray-700 font-medium">卡片毛玻璃效果</label>
                         <label class="switch">
                             <input type="checkbox" id="frostedGlassSwitch">
                             <span class="slider round"></span>
@@ -691,7 +691,7 @@
                     </div>
 
                     <div class="p-2 hover:bg-gray-50 rounded" id="frostedGlassIntensityContainer">
-                         <label for="frostedGlassIntensity" class="block text-gray-700 font-medium mb-1">姣涚幓鐠冩ā绯婄▼搴? <span id="frostedGlassIntensityValue">15</span>px</label>
+                         <label for="frostedGlassIntensity" class="block text-gray-700 font-medium mb-1">毛玻璃模糊程度: <span id="frostedGlassIntensityValue">15</span>px</label>
                          <input type="range" id="frostedGlassIntensity" min="0" max="50" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                     </div>
 
@@ -701,17 +701,17 @@
 
            
 
-            <!-- 澹佺焊璁剧疆鍐呭 -->
+            <!-- 壁纸设置内容 -->
             <div id="wallpaper-settings" class="settings-tab-content">
                 <div class="form-group-stack" style="margin-top: 1rem;">
                     <div class="p-2 hover:bg-gray-50 rounded">
-                        <label for="customWallpaperInput" class="block text-gray-700 font-medium mb-2">鑷畾涔夊绾?(鐣欑┖鍒欎娇鐢ㄩ粯璁よ儗鏅?</label>
+                        <label for="customWallpaperInput" class="block text-gray-700 font-medium mb-2">自定义壁纸 (留空则使用默认背景)</label>
                         <input type="text" id="customWallpaperInput" placeholder="https://example.com/wallpaper.jpg" class="form-input w-full">
                     </div>
                     <div class="p-2 rounded bg-gray-50 border border-gray-100 mt-4">
                          <div class="flex flex-col space-y-3 mb-2">
                              <div class="flex items-center justify-between">
-                                 <label class="block text-gray-700 font-medium">鍦ㄧ嚎澹佺焊搴?(鐐瑰嚮搴旂敤)</label>
+                                 <label class="block text-gray-700 font-medium">在线壁纸库 (点击应用)</label>
                                  <div class="flex items-center space-x-1 bg-gray-200 rounded p-1">
                                      <button id="wpSourceBing" class="px-3 py-1 text-xs font-medium rounded shadow-sm bg-white text-gray-800 transition-colors">Bing</button>
                                      <button id="wpSource360" class="px-3 py-1 text-xs font-medium rounded text-gray-600 hover:text-gray-800 hover:bg-white/50 transition-colors">360</button>
@@ -719,36 +719,36 @@
                              </div>
                              
                              <div class="flex items-center justify-between bg-white p-2 rounded border border-gray-200">
-                                 <span class="text-xs text-gray-500" id="wpFilterLabel">绛涢€?</span>
+                                 <span class="text-xs text-gray-500" id="wpFilterLabel">筛选:</span>
                                  
                                  <!-- Bing Filter -->
                                  <select id="bingCountry" class="text-sm border-none bg-transparent focus:ring-0 outline-none focus:outline-none text-gray-700 font-medium cursor-pointer text-right">
-                                     <option value="">榛樿 (Global)</option>
-                                     <option value="spotlight">Spotlight (Windows 鑱氱劍)</option>
+                                     <option value="">默认 (Global)</option>
+                                     <option value="spotlight">Spotlight (Windows 聚焦)</option>
                                  </select>
 
                                  <!-- 360 Filter (Hidden by default) -->
                                  <select id="category360" class="text-sm border-none bg-transparent focus:ring-0 outline-none focus:outline-none text-gray-700 font-medium cursor-pointer text-right hidden">
-                                     <option value="36">4K涓撳尯</option>
+                                     <option value="36">4K专区</option>
                                  </select>
                              </div>
                          </div>
 
                          <div id="onlineWallpapers" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 min-h-[150px] max-h-[400px] overflow-y-auto custom-scrollbar p-1">
-                             <div class="col-span-full text-center text-gray-400 py-10 text-sm">鍔犺浇涓?..</div>
+                             <div class="col-span-full text-center text-gray-400 py-10 text-sm">加载中...</div>
                          </div>
                     </div>
                     <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                        <label for="randomWallpaperSwitch" class="cursor-pointer select-none text-gray-700 font-medium">澹佺焊杞 (椤哄簭鍒囨崲)</label>
+                        <label for="randomWallpaperSwitch" class="cursor-pointer select-none text-gray-700 font-medium">壁纸轮询 (顺序切换)</label>
                         <label class="switch">
                             <input type="checkbox" id="randomWallpaperSwitch">
                             <span class="slider round"></span>
                         </label>
                     </div>
-                    <p class="text-xs text-gray-500 mb-4 px-2">寮€鍚悗姣忔璁块棶灏嗛殢鏈烘洿鎹㈠绾?/p>
+                    <p class="text-xs text-gray-500 mb-4 px-2">开启后每次访问将随机更换壁纸</p>
 
                     <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                        <label for="bgBlurSwitch" class="cursor-pointer select-none text-gray-700 font-medium">鑳屾櫙铏氬寲</label>
+                        <label for="bgBlurSwitch" class="cursor-pointer select-none text-gray-700 font-medium">背景虚化</label>
                         <label class="switch">
                             <input type="checkbox" id="bgBlurSwitch">
                             <span class="slider round"></span>
@@ -756,7 +756,7 @@
                     </div>
 
                     <div class="p-2 hover:bg-gray-50 rounded" id="bgBlurIntensityContainer">
-                         <label for="bgBlurIntensity" class="block text-gray-700 font-medium mb-1">鑳屾櫙铏氬寲绋嬪害: <span id="bgBlurIntensityValue">0</span>px</label>
+                         <label for="bgBlurIntensity" class="block text-gray-700 font-medium mb-1">背景虚化程度: <span id="bgBlurIntensityValue">0</span>px</label>
                          <input type="range" id="bgBlurIntensity" min="0" max="50" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                     </div>
 
@@ -764,51 +764,52 @@
                 </div>
             </div>
 
-            <!-- AI 璁剧疆鍐呭 -->
+            <!-- AI 设置内容 -->
             <div id="ai-settings" class="settings-tab-content">
                 <div>
-                <label class="form-label" for="providerSelector">API 鎻愪緵鍟?/label>
+                <label class="form-label" for="providerSelector">API 提供商</label>
                 <select id="providerSelector" class="form-input" style="margin-bottom: 1rem;">
-                    <option value="workers-ai">Cloudflare Workers AI (鎺ㄨ崘)</option>
+                    <option value="workers-ai">Cloudflare Workers AI (推荐)</option>
                     <option value="gemini">Google Gemini</option>
-                    <option value="openai">OpenAI 鍏煎</option>
+                    <option value="openai">OpenAI 兼容</option>
                 </select>
                 </div>
 
                 <div class="form-group-stack">
                 <div>
-                    <label for="apiKey" class="form-label-icon"><span>馃攽</span> API Key</label>
+                    <label for="apiKey" class="form-label-icon"><span>🔑</span> API Key</label>
                     <input type="password" id="apiKey" placeholder="sk-..." class="form-input">
                 </div>
 
                 <div id="baseUrlGroup" style="display: none;">
-                    <label for="baseUrl" class="form-label-icon"><span>馃實</span> Base URL (API 鍦板潃)</label>
+                    <label for="baseUrl" class="form-label-icon"><span>🌍</span> Base URL (API 地址)</label>
                     <input type="text" id="baseUrl" placeholder="https://api.openai.com" class="form-input">
-                    <p class="form-hint">渚嬪: https://api.openai.com (涓嶉渶瑕佸姞 /v1/chat/completions)</p>
+                    <p class="form-hint">例如: https://api.openai.com (不需要加 /v1/chat/completions)</p>
                 </div>
 
                 <div>
-                    <label for="modelName" class="form-label-icon"><span>鉁?/span> 妯″瀷鍚嶇О</label>
+                    <label for="modelName" class="form-label-icon"><span>✨</span> 模型名称</label>
                     <input type="text" id="modelName" placeholder="gemini-1.5-flash" class="form-input">
                 </div>
                 </div>
 
                 <div class="batch-actions-section" style="margin-top: 1rem;">
                 <div id="bulkGenerateIdle" class="bulk-action-box">
-                    <p class="form-hint">鑷姩鎵弿鎵€鏈夋病鏈夋弿杩扮殑閾炬帴锛屽苟璋冪敤涓婃柟閰嶇疆鐨?AI 妯″瀷鐢熸垚绠€浠嬨€?/p>
+                    <p class="form-hint">自动扫描所有没有描述的链接，并调用上方配置的 AI 模型生成简介。</p>
                     <button id="batchCompleteDescBtn" class="button-secondary">
-                    <span>鉁?/span> 涓€閿ˉ鍏ㄦ墍鏈夋弿杩?                    </button>
+                    <span>✨</span> 一键补全所有描述
+                    </button>
                 </div>
                 <div id="bulkGenerateProgress" class="bulk-action-box" style="display: none;">
                     <div class="progress-info">
-                    <span>姝ｅ湪鐢熸垚鎻忚堪...</span>
+                    <span>正在生成描述...</span>
                     <span id="progressCounter">0 / 0</span>
                     </div>
                     <div class="progress-bar-container">
                     <div id="progressBar" class="progress-bar"></div>
                     </div>
                     <button id="stopBulkGenerateBtn" class="button-danger">
-                    <span>鈴革笍</span> 鍋滄澶勭悊
+                    <span>⏸️</span> 停止处理
                     </button>
                 </div>
                 </div>
@@ -816,8 +817,8 @@
           </div>
 
           <div class="modal-footer">
-            <button id="cancelSettingsBtn" class="button-tertiary">鍙栨秷</button>
-            <button id="saveSettingsBtn" class="button-primary"><span>馃捑</span> 淇濆瓨璁剧疆</button>
+            <button id="cancelSettingsBtn" class="button-tertiary">取消</button>
+            <button id="saveSettingsBtn" class="button-primary"><span>💾</span> 保存设置</button>
           </div>
         </div>
       </div>
@@ -826,9 +827,9 @@
 
       <div class="tab-wrapper">
         <div class="tab-buttons">
-          <button class="tab-button active" data-tab="config">涔︾鍒楄〃</button>
-          <button class="tab-button" data-tab="pending">寰呭鏍稿垪琛?/button>
-          <button class="tab-button" data-tab="categories">鍒嗙被鍒楄〃</button>
+          <button class="tab-button active" data-tab="config">书签列表</button>
+          <button class="tab-button" data-tab="pending">待审核列表</button>
+          <button class="tab-button" data-tab="categories">分类列表</button>
         </div>
 
         <div id="config" class="tab-content active">
@@ -836,25 +837,26 @@
             <div class="bookmark-toolbar mb-4 flex justify-between items-center">
               <div class="flex items-center gap-2">
                  <p class="text-gray-500 text-sm">
-                    鎷栧姩鍗＄墖鍙皟鏁存帓搴?                 </p>
+                    拖动卡片可调整排序
+                 </p>
               </div>
             </div>
             <div id="configGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               <!-- data render by js -->
             </div>
             <div class="pagination mt-6 flex justify-center items-center gap-4">
-              <button id="prevPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">涓婁竴椤?/button>
+              <button id="prevPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
               <span class="text-gray-600">
                   <span id="currentPage" class="font-medium">1</span> / <span id="totalPages">1</span>
               </span>
-              <button id="nextPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">涓嬩竴椤?/button>
+              <button id="nextPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
               
               <select id="pageSizeSelect" class="ml-2 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white">
-                  <option value="50" selected>50鏉?椤?/option>
-                  <option value="100">100鏉?椤?/option>
-                  <option value="200">200鏉?椤?/option>
-                  <option value="500">500鏉?椤?/option>
-                  <option value="10000">鍏ㄩ儴</option>
+                  <option value="50" selected>50条/页</option>
+                  <option value="100">100条/页</option>
+                  <option value="200">200条/页</option>
+                  <option value="500">500条/页</option>
+                  <option value="10000">全部</option>
               </select>
             </div>
           </div>
@@ -879,12 +881,12 @@
               </tbody>
             </table>
             <div class="pagination">
-              <button id="pendingPrevPage" disabled>涓婁竴椤?/button>
+              <button id="pendingPrevPage" disabled>上一页</button>
               <span id="pendingCurrentPage">1</span>/<span
                 id="pendingTotalPages"
                 >1</span
               >
-              <button id="pendingNextPage" disabled>涓嬩竴椤?/button>
+              <button id="pendingNextPage" disabled>下一页</button>
             </div>
           </div>
         </div>
@@ -897,28 +899,29 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    杩斿洖涓婄骇
+                    返回上级
                  </button>
                  <span id="categoryBreadcrumb" class="text-gray-700 font-medium ml-2"></span>
                  <p class="category-hint text-gray-500 text-sm ml-2 hidden sm:block">
-                    鎷栧姩鍗＄墖鍙皟鏁存帓搴?                 </p>
+                    拖动卡片可调整排序
+                 </p>
               </div>
             </div>
             <div id="categoryGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                <!-- data render by js -->
             </div>
             <div class="pagination mt-6 flex justify-center items-center gap-4">
-              <button id="categoryPrevPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">涓婁竴椤?/button>
+              <button id="categoryPrevPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
               <span class="text-gray-600">
                   <span id="categoryCurrentPage" class="font-medium">1</span> / <span id="categoryTotalPages">1</span>
               </span>
-              <button id="categoryNextPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">涓嬩竴椤?/button>
+              <button id="categoryNextPage" disabled class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
               
               <select id="categoryPageSizeSelect" class="ml-2 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white">
-                  <option value="20">20鏉?椤?/option>
-                  <option value="50">50鏉?椤?/option>
-                  <option value="100">100鏉?椤?/option>
-                  <option value="10000" selected>鍏ㄩ儴</option>
+                  <option value="20">20条/页</option>
+                  <option value="50">50条/页</option>
+                  <option value="100">100条/页</option>
+                  <option value="10000" selected>全部</option>
               </select>
             </div>
           </div>
@@ -926,28 +929,28 @@
       </div>
     </div>
 
-      <!-- 鎵归噺绠＄悊妯℃€佹 -->
+      <!-- 批量管理模态框 -->
       <div id="batchModal" class="modal" style="display: none;">
         <div class="modal-content flex flex-col" style="max-width: 900px; width: 90%; height: 80vh; max-height: 800px; margin: auto;">
-          <span class="modal-close" id="closeBatchModal">脳</span>
-          <h2 class="mb-4">鎵归噺绠＄悊</h2>
+          <span class="modal-close" id="closeBatchModal">×</span>
+          <h2 class="mb-4">批量管理</h2>
           
-          <!-- 椤堕儴宸ュ叿鏍?-->
+          <!-- 顶部工具栏 -->
           <div class="flex flex-wrap gap-4 justify-between items-center mb-4 p-2 bg-gray-50 rounded shrink-0">
             <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-gray-700">杩囨护:</span>
+                <span class="text-sm font-medium text-gray-700">过滤:</span>
                 <div id="batchCategoryFilterWrapper" class="custom-dropdown-wrapper" style="width: 200px;"></div>
                 <input type="hidden" id="batchCategoryFilter" value="">
             </div>
             
             <div class="flex gap-2">
-                <button id="batchDeleteBtn" class="bg-red-600 text-white px-3 py-1.5 rounded text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">鍒犻櫎</button>
-                <button id="batchChangeCategoryBtn" class="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">鏇存敼鍒嗙被</button>
-                <button id="batchChangePrivacyBtn" class="bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">鏇存敼闅愮</button>
+                <button id="batchDeleteBtn" class="bg-red-600 text-white px-3 py-1.5 rounded text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">删除</button>
+                <button id="batchChangeCategoryBtn" class="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">更改分类</button>
+                <button id="batchChangePrivacyBtn" class="bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">更改隐私</button>
             </div>
           </div>
 
-          <!-- 琛ㄦ牸鍖哄煙 -->
+          <!-- 表格区域 -->
           <div class="flex-1 overflow-auto border rounded border-gray-200 min-h-0">
               <table class="w-full text-left border-collapse">
                   <thead class="bg-gray-100 sticky top-0 z-10">
@@ -957,74 +960,75 @@
                           </th>
                           <th class="p-3 border-b w-16">ID</th>
                           <th class="p-3 border-b w-16">Logo</th>
-                          <th class="p-3 border-b">鏍囬</th>
-                          <th class="p-3 border-b w-32">鍒嗙被</th>
-                          <th class="p-3 border-b w-20 text-center">闅愮</th>
+                          <th class="p-3 border-b">标题</th>
+                          <th class="p-3 border-b w-32">分类</th>
+                          <th class="p-3 border-b w-20 text-center">隐私</th>
                       </tr>
                   </thead>
                   <tbody id="batchTableBody" class="text-sm">
-                      <!-- 鍔ㄦ€佸～鍏?-->
+                      <!-- 动态填充 -->
                   </tbody>
               </table>
           </div>
 
-          <!-- 搴曢儴閫氳繃鍒嗛〉 -->
+          <!-- 底部通过分页 -->
           <div class="mt-4 flex justify-between items-center shrink-0">
              <div class="text-sm text-gray-500">
-                 宸查€?<span id="batchSelectedCount" class="font-bold text-gray-800">0</span> 椤?             </div>
+                 已选 <span id="batchSelectedCount" class="font-bold text-gray-800">0</span> 项
+             </div>
              <div class="flex items-center gap-2">
-                 <button id="batchPrevPage" class="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 text-sm">涓婁竴椤?/button>
+                 <button id="batchPrevPage" class="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 text-sm">上一页</button>
                  <span class="text-sm">
                      <span id="batchCurrentPageNum">1</span> / <span id="batchTotalPagesNum">1</span>
                  </span>
-                 <button id="batchNextPage" class="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 text-sm">涓嬩竴椤?/button>
+                 <button id="batchNextPage" class="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 text-sm">下一页</button>
                  <select id="batchPageSize" class="ml-2 border rounded p-1 text-sm">
-                     <option value="50">50鏉?椤?/option>
-                     <option value="100">100鏉?椤?/option>
-                     <option value="200">200鏉?椤?/option>
-                     <option value="500">500鏉?椤?/option>
+                     <option value="50">50条/页</option>
+                     <option value="100">100条/页</option>
+                     <option value="200">200条/页</option>
+                     <option value="500">500条/页</option>
                  </select>
              </div>
           </div>
         </div>
       </div>
 
-      <!-- 鎵归噺鏇存敼鍒嗙被妯℃€佹 -->
+      <!-- 批量更改分类模态框 -->
       <div id="batchCategoryModal" class="modal" style="display: none; z-index: 2000;">
           <div class="modal-content" style="max-width: 400px;">
-              <span class="modal-close" id="closeBatchCategoryModal">脳</span>
-              <h3>閫夋嫨鏂板垎绫?/h3>
-              <p class="text-sm text-gray-500 mb-4">灏嗛€変腑鐨勪功绛剧Щ鍔ㄥ埌浠ヤ笅鍒嗙被锛?/p>
+              <span class="modal-close" id="closeBatchCategoryModal">×</span>
+              <h3>选择新分类</h3>
+              <p class="text-sm text-gray-500 mb-4">将选中的书签移动到以下分类：</p>
               <div class="form-group">
                   <div id="batchTargetCategoryWrapper" class="custom-dropdown-wrapper w-full"></div>
                   <input type="hidden" id="batchTargetCategory" value="">
               </div>
               <div class="flex justify-end gap-3 mt-4">
-                  <button id="cancelBatchCategoryBtn" class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 text-sm">鍙栨秷</button>
-                  <button id="confirmBatchCategoryBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">纭畾</button>
+                  <button id="cancelBatchCategoryBtn" class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 text-sm">取消</button>
+                  <button id="confirmBatchCategoryBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">确定</button>
               </div>
           </div>
       </div>
 
-      <!-- 鎵归噺鏇存敼闅愮妯℃€佹 -->
+      <!-- 批量更改隐私模态框 -->
       <div id="batchPrivacyModal" class="modal" style="display: none; z-index: 2000;">
           <div class="modal-content" style="max-width: 400px;">
-              <span class="modal-close" id="closeBatchPrivacyModal">脳</span>
-              <h3>鏇存敼闅愮灞炴€?/h3>
-              <p class="text-sm text-gray-500 mb-4">璁剧疆閫変腑涔︾鐨勯殣绉佺姸鎬侊細</p>
+              <span class="modal-close" id="closeBatchPrivacyModal">×</span>
+              <h3>更改隐私属性</h3>
+              <p class="text-sm text-gray-500 mb-4">设置选中书签的隐私状态：</p>
               <div class="flex gap-4 justify-center mb-6">
                   <label class="flex items-center gap-2 cursor-pointer p-3 border rounded hover:bg-gray-50 flex-1">
                       <input type="radio" name="batchPrivacyOption" value="1" class="w-4 h-4 text-blue-600">
-                      <span>绉佸瘑 (Private)</span>
+                      <span>私密 (Private)</span>
                   </label>
                   <label class="flex items-center gap-2 cursor-pointer p-3 border rounded hover:bg-gray-50 flex-1">
                       <input type="radio" name="batchPrivacyOption" value="0" checked class="w-4 h-4 text-blue-600">
-                      <span>鍏紑 (Public)</span>
+                      <span>公开 (Public)</span>
                   </label>
               </div>
               <div class="flex justify-end gap-3">
-                  <button id="cancelBatchPrivacyBtn" class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 text-sm">鍙栨秷</button>
-                  <button id="confirmBatchPrivacyBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">纭畾</button>
+                  <button id="cancelBatchPrivacyBtn" class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 text-sm">取消</button>
+                  <button id="confirmBatchPrivacyBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">确定</button>
               </div>
           </div>
       </div>

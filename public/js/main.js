@@ -1,4 +1,4 @@
-﻿document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
   // 绂佺敤娴忚鍣ㄨ嚜鍔ㄦ粴鍔ㄦ仮澶嶏紝纭繚鍒锋柊鍚庡缁堜粠椤堕儴寮€濮?
   if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual';
@@ -250,7 +250,7 @@
       const response = await fetch('/api/categories?pageSize=999');
       const data = await response.json();
       if (data.code === 200 && data.data) {
-        selectElement.innerHTML = '<option value="" disabled selected>璇烽€夋嫨涓€涓垎绫?/option>';
+        selectElement.innerHTML = '<option value="" disabled selected>请选择一个分类</option>';
         data.data.forEach(category => {
           const option = document.createElement('option');
           option.value = category.id;
@@ -258,11 +258,11 @@
           selectElement.appendChild(option);
         });
       } else {
-        selectElement.innerHTML = '<option value="" disabled>鏃犳硶鍔犺浇鍒嗙被</option>';
+        selectElement.innerHTML = '<option value="" disabled>无法加载分类</option>';
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error);
-      selectElement.innerHTML = '<option value="" disabled>鍔犺浇鍒嗙被澶辫触</option>';
+      selectElement.innerHTML = '<option value="" disabled>加载分类失败</option>';
     }
   }
 
@@ -302,11 +302,11 @@
         closeModal();
         addSiteForm.reset();
       } else {
-        alert(data.message || '鎻愪氦澶辫触');
+        alert(data.message || '提交失败');
       }
     })
     .catch(err => {
-      console.error('缃戠粶閿欒:', err);
+      console.error('网络错误:', err);
       alert('Network error. Please try again later.');
     });
   });
@@ -333,10 +333,10 @@
   window.currentSearchEngine = currentSearchEngine;
 
   const searchPlaceholderMap = {
-      local: '鎼滅储涔︾...',
-      google: 'Google 鎼滅储...',
-      baidu: '鐧惧害鎼滅储...',
-      bing: 'Bing 鎼滅储...'
+      local: '搜索书签...',
+      google: 'Google 搜索...',
+      baidu: '百度搜索...',
+      bing: 'Bing 搜索...'
   };
   let currentSearchKeyword = '';
   const searchPlaceholder = searchPlaceholderMap[currentSearchEngine] || searchPlaceholderMap.local;
@@ -888,7 +888,7 @@
                 <span class="bookmark-group-name">${escapeHTML(groupName)}</span>
                 <span class="bookmark-group-count">${orderedCards.length}</span>
               </div>
-              <span class="bookmark-group-sort-hint">鎷栧姩鎺掑簭</span>
+              <span class="bookmark-group-sort-hint">拖动排序</span>
             </div>
           `;
 
@@ -930,7 +930,7 @@
       sitesGrid.innerHTML = '';
       
       if (sites.length === 0) {
-          sitesGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10">鏈垎绫讳笅鏆傛棤涔︾</div>';
+          sitesGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10">当前分类下暂无书签</div>';
           return;
       }
 
@@ -1140,7 +1140,7 @@
   });
 
   if (themeToggleBtn) {
-      themeToggleBtn.title = '鍒囨崲涓婚锛堝弻鍑绘仮澶嶈嚜鍔級';
+      themeToggleBtn.title = '切换主题（双击恢复自动）';
 
       themeToggleBtn.addEventListener('click', () => {
           const isDark = document.documentElement.classList.contains('dark');
