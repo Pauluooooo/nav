@@ -1254,7 +1254,7 @@ export async function onRequest(context) {
       
       bgLayerHtml = `
         <div id="fixed-background" style="position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;">
-          <img src="${safeWallpaperUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; ${blurStyle}" />
+          <img src="${safeWallpaperUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; object-position: center center; ${blurStyle}" />
         </div>
       `;
   } else {
@@ -1274,8 +1274,10 @@ export async function onRequest(context) {
       }
       #app-scroll {
         width: 100%;
-        height: 100dvh;
-        min-height: 100%;
+        height: 100vh;
+        height: 100svh;
+        min-height: 100vh;
+        min-height: 100svh;
         overflow-y: auto; /* 允许纵向滚动 */
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch; /* iOS 原生惯性滚动 */
@@ -1285,7 +1287,8 @@ export async function onRequest(context) {
       body {
         background-color: transparent !important;
         overflow: hidden; /* 禁止 body 滚动，交由 #app-scroll 管理 */
-        min-height: 100dvh;
+        min-height: 100vh;
+        min-height: 100svh;
         position: relative;
       }
       #fixed-background {
@@ -1299,8 +1302,8 @@ export async function onRequest(context) {
       /* 修复 iOS 上 100vh 问题 (针对背景层) */
       @supports (-webkit-touch-callout: none) {
         #app-scroll {
-          height: -webkit-fill-available;
-          min-height: -webkit-fill-available;
+          height: 100svh;
+          min-height: 100svh;
         }
       }
     </style>

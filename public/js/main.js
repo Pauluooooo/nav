@@ -13,8 +13,24 @@ document.addEventListener('DOMContentLoaded', function() {
   const scrollContainer = appScroll || window;
 
   function getCurrentScrollTop() {
-    if (appScroll) return appScroll.scrollTop || 0;
-    return window.pageYOffset || document.documentElement.scrollTop || 0;
+    const appScrollTop = appScroll ? (appScroll.scrollTop || 0) : 0;
+    const windowScrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+    return Math.max(appScrollTop, windowScrollTop);
+  }
+
+  function resetScrollToTop() {
+    if (appScroll) appScroll.scrollTop = 0;
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    // Run one more frame to override late browser restoration.
+    requestAnimationFrame(() => {
+      if (appScroll) appScroll.scrollTop = 0;
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
   }
 
   function smoothScrollTo(top) {
@@ -153,6 +169,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     scrollContainer.addEventListener('scroll', toggleBackToTop, { passive: true });
+    if (appScroll) {
+        window.addEventListener('scroll', toggleBackToTop, { passive: true });
+    }
     window.addEventListener('wheel', handleWheel, { passive: true });
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('keydown', handleKeyDown, { passive: true });
@@ -656,7 +675,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateNavigationState(null);
         updateHeading(currentSearchKeyword, null, visibleCount);
         smoothScrollTo(0);
-        history.pushState(null, '', href);
+        history.replaceState(null, '', window.location.pathname);
     } else {
         updateNavigationState(catalogId);
         const targetSection = locateCategoryGroup(catalogId, catalogName);
@@ -664,7 +683,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ? targetSection.querySelectorAll('.site-card:not(.hidden)').length
             : visibleCount;
         updateHeading(currentSearchKeyword, catalogName || null, groupVisibleCount);
-        history.pushState(null, '', href);
+        history.replaceState(null, '', window.location.pathname);
     }
   });
 
@@ -1211,8 +1230,10 @@ document.addEventListener('DOMContentLoaded', function() {
       updateHeading(currentSearchKeyword, null, visibleCount);
       updateNavigationState(null);
       // 强制滚动到顶部，覆盖浏览器的滚动位置恢复
-      if (appScroll) appScroll.scrollTop = 0;
+      resetScrollToTop();
   })();
+
+  window.addEventListener('load', resetScrollToTop, { once: true });
 
   // 处理 bfcache（前进后退缓存）恢复时重置分类状态
   window.addEventListener('pageshow', function(event) {
@@ -1220,7 +1241,7 @@ document.addEventListener('DOMContentLoaded', function() {
           ensureAllSitesRenderedForGroupedView();
           updateNavigationState(null);
           updateHeading(currentSearchKeyword, null);
-          if (appScroll) appScroll.scrollTop = 0;
+          resetScrollToTop();
       }
   });
 
