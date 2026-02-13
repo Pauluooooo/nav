@@ -196,7 +196,8 @@ export async function onRequest(context) {
                       END) = 0 OR ? = 1) 
                       ORDER BY sort_order ASC, create_time DESC`;
 
-  // 骞惰鎵ц鎵€鏈夋煡璇?  const [categoriesResult, settingsResult, sitesResult] = await Promise.all([
+  // 骞惰鎵ц鎵€鏈夋煡璇?
+  const [categoriesResult, settingsResult, sitesResult] = await Promise.all([
     env.NAV_DB.prepare(categoryQuery).all().catch(e => ({ results: [], error: e })),
     env.NAV_DB.prepare(`SELECT key, value FROM settings WHERE key IN (${settingsPlaceholders})`).bind(...settingsKeys).all().catch(e => ({ results: [], error: e })),
     env.NAV_DB.prepare(sitesQuery).bind(includePrivate).all().catch(e => ({ results: [], error: e }))
