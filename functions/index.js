@@ -182,11 +182,9 @@ export async function onRequest(context) {
     'home_search_engine_enabled', 'home_search_engine_provider',
     'home_theme_mode', 'home_theme_auto_dark_start', 'home_theme_auto_dark_end',
     'layout_grid_cols', 'layout_custom_wallpaper',
-    'layout_random_wallpaper', 'bing_country',
     'layout_enable_frosted_glass', 'layout_frosted_glass_intensity',
     'layout_enable_bg_blur', 'layout_bg_blur_intensity', 'layout_card_style',
     'layout_card_border_radius', 'layout_card_scale', 'card_width',
-    'wallpaper_source', 'wallpaper_cid_360',
     'card_title_font', 'card_title_size', 'card_title_color',
     'card_desc_font', 'card_desc_size', 'card_desc_color'
   ];
@@ -267,8 +265,6 @@ export async function onRequest(context) {
   let homeThemeAutoDarkEnd = '7';
   let layoutGridCols = '4';
   let layoutCustomWallpaper = '';
-  let layoutRandomWallpaper = false;
-  let bingCountry = '';
   let layoutEnableFrostedGlass = false;
   let layoutFrostedGlassIntensity = '15';
   let layoutEnableBgBlur = false;
@@ -276,8 +272,6 @@ export async function onRequest(context) {
   let layoutCardStyle = 'style1';
   let layoutCardBorderRadius = '12';
   let layoutCardScale = '100';
-  let wallpaperSource = 'bing';
-  let wallpaperCid360 = '36';
   
   let cardTitleFont = '';
   let cardTitleSize = '';
@@ -324,8 +318,6 @@ export async function onRequest(context) {
 
       if (row.key === 'layout_grid_cols') layoutGridCols = row.value;
       if (row.key === 'layout_custom_wallpaper') layoutCustomWallpaper = row.value;
-      if (row.key === 'layout_random_wallpaper') layoutRandomWallpaper = row.value === 'true';
-      if (row.key === 'bing_country') bingCountry = row.value;
       if (row.key === 'layout_enable_frosted_glass') layoutEnableFrostedGlass = row.value === 'true';
       if (row.key === 'layout_frosted_glass_intensity') layoutFrostedGlassIntensity = row.value;
       if (row.key === 'layout_enable_bg_blur') layoutEnableBgBlur = row.value === 'true';
@@ -333,8 +325,6 @@ export async function onRequest(context) {
       if (row.key === 'layout_card_style') layoutCardStyle = row.value;
       if (row.key === 'layout_card_border_radius') layoutCardBorderRadius = row.value;
       if (row.key === 'layout_card_scale') layoutCardScale = row.value;
-      if (row.key === 'wallpaper_source') wallpaperSource = row.value;
-      if (row.key === 'wallpaper_cid_360') wallpaperCid360 = row.value;
       
       if (row.key === 'card_title_font') cardTitleFont = row.value;
       if (row.key === 'card_title_size') cardTitleSize = row.value;
@@ -377,55 +367,8 @@ export async function onRequest(context) {
   // Always render all sites; category nav only drives in-page grouping.
   let sites = allSites;
 
-  // Random wallpaper rotation.
-  let nextWallpaperIndex = 0;
-  if (layoutRandomWallpaper) {
-    try {
-      const cookies = request.headers.get('Cookie') || '';
-      const match = cookies.match(/wallpaper_index=(\d+)/);
-      const currentWallpaperIndex = match ? parseInt(match[1]) : -1;
-
-      if (wallpaperSource === '360') {
-        const cid = wallpaperCid360 || '36';
-        const apiUrl = `http://cdn.apc.360.cn/index.php?c=WallPaper&a=getAppsByCategory&from=360chrome&cid=${cid}&start=0&count=8`;
-        const res = await fetch(apiUrl);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.errno === "0" && json.data && json.data.length > 0) {
-            nextWallpaperIndex = (currentWallpaperIndex + 1) % json.data.length;
-            const targetItem = json.data[nextWallpaperIndex];
-            let targetUrl = targetItem.url;
-            if (targetUrl) {
-              targetUrl = targetUrl.replace('http://', 'https://');
-              layoutCustomWallpaper = targetUrl;
-            }
-          }
-        }
-      } else {
-        // Default to Bing
-        let bingUrl = '';
-        if (bingCountry === 'spotlight') {
-          bingUrl = 'https://peapix.com/spotlight/feed?n=7';
-        } else {
-          bingUrl = `https://peapix.com/bing/feed?n=7&country=${bingCountry}`;
-        }
-        const res = await fetch(bingUrl);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            nextWallpaperIndex = (currentWallpaperIndex + 1) % data.length;
-            const targetItem = data[nextWallpaperIndex];
-            const targetUrl = targetItem.fullUrl || targetItem.url;
-            if (targetUrl) {
-              layoutCustomWallpaper = targetUrl;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Random Wallpaper Error:', e);
-    }
-  }
+  // Wallpaper is rendered directly from layout_custom_wallpaper when provided.
+  // External random wallpaper polling has been removed to keep home rendering fast.
 
     const isCustomWallpaper = Boolean(layoutCustomWallpaper);
 
@@ -1156,11 +1099,8 @@ export async function onRequest(context) {
         cardStyle: "${layoutCardStyle}",
         cardWidth: "${cardWidth}",
         enableFrostedGlass: ${layoutEnableFrostedGlass},
-        randomWallpaper: ${layoutRandomWallpaper},
-        wallpaperSource: "${wallpaperSource}",
-        wallpaperCid360: "${wallpaperCid360}",
-        bingCountry: "${bingCountry}",
         searchEngine: "${homeSearchEngineProvider}",
+        bookmarkSortMode: "${isAuthenticated ? 'server' : 'local'}",
         themeMode: "${homeThemeMode}",
         themeAutoDarkStart: ${homeThemeAutoDarkStart},
         themeAutoDarkEnd: ${homeThemeAutoDarkEnd}

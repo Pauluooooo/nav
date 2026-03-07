@@ -67,20 +67,6 @@ document.addEventListener('DOMContentLoaded', function() {
     return rect.top + window.scrollY;
   }
 
-  function runWhenIdle(task, timeout = 300) {
-    if (typeof task !== 'function') return;
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(() => task(), { timeout });
-      return;
-    }
-    const delay = Math.max(0, Number(timeout) || 0);
-    setTimeout(task, delay);
-  }
-
-  function waitForIdle(timeout = 300) {
-    return new Promise((resolve) => runWhenIdle(resolve, timeout));
-  }
-
   function isEditableTarget(target) {
     if (!(target instanceof HTMLElement)) return false;
     return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
@@ -374,6 +360,10 @@ document.addEventListener('DOMContentLoaded', function() {
   const allowedSearchEngines = new Set(['local', 'google', 'baidu', 'bing']);
   const configuredSearchEngine = String(window.IORI_LAYOUT_CONFIG?.searchEngine || 'local').toLowerCase();
   const currentSearchEngine = allowedSearchEngines.has(configuredSearchEngine) ? configuredSearchEngine : 'local';
+  const configuredBookmarkSortMode = String(window.IORI_LAYOUT_CONFIG?.bookmarkSortMode || 'local').toLowerCase();
+  const useServerBookmarkSortSync = configuredBookmarkSortMode === 'server';
+  const groupSortSaveQueue = new Map();
+  const migratedLocalSortKeys = new Set();
   window.currentSearchEngine = currentSearchEngine;
 
   const searchPlaceholderMap = {
@@ -679,8 +669,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   }
 
-  function applyGroupSortOrder(groupName, cards, catalogId = '') {
-      const orderList = loadGroupSortOrder(groupName, catalogId);
+  function sortCardsByOrderList(cards, orderList) {
       if (!orderList.length) return cards;
       const orderIndex = new Map(orderList.map((id, index) => [String(id), index]));
       return [...cards].sort((a, b) => {
@@ -693,12 +682,103 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   }
 
+  function applyGroupSortOrder(groupName, cards, catalogId = '') {
+      if (useServerBookmarkSortSync) {
+          const localOrder = loadGroupSortOrder(groupName, catalogId);
+          if (!localOrder.length) return cards;
+
+          const normalizedCatalogId = String(catalogId || '').trim();
+          if (!normalizedCatalogId) {
+              return sortCardsByOrderList(cards, localOrder);
+          }
+
+          const storageKey = getGroupStorageKey(groupName, normalizedCatalogId);
+          if (migratedLocalSortKeys.has(storageKey)) {
+              return cards;
+          }
+          migratedLocalSortKeys.add(storageKey);
+
+          const orderedCards = sortCardsByOrderList(cards, localOrder);
+          const ids = orderedCards
+              .map((card) => String(card.getAttribute('data-id') || '').trim())
+              .filter(Boolean);
+
+          enqueueGroupSortSave(groupName, normalizedCatalogId, async () => {
+              const synced = await syncGroupSortOrderToServer(normalizedCatalogId, ids);
+              if (synced) {
+                  localStorage.removeItem(storageKey);
+                  return;
+              }
+              showToast('Sort sync failed. Please sign in to admin and retry.');
+          });
+
+          return orderedCards;
+      }
+      const orderList = loadGroupSortOrder(groupName, catalogId);
+      if (!orderList.length) return cards;
+      return sortCardsByOrderList(cards, orderList);
+  }
+
+  function collectGroupCardIds(groupGrid) {
+      return Array.from(groupGrid.querySelectorAll('.site-card'))
+          .map(card => String(card.getAttribute('data-id') || '').trim())
+          .filter(Boolean);
+  }
+
+  function enqueueGroupSortSave(groupName, catalogId, task) {
+      const queueKey = getGroupStorageKey(groupName, catalogId);
+      const prev = groupSortSaveQueue.get(queueKey) || Promise.resolve();
+      const next = prev
+          .catch(() => {})
+          .then(task)
+          .catch((error) => {
+              console.error('Failed to save group sort order:', error);
+          });
+      groupSortSaveQueue.set(queueKey, next);
+      return next;
+  }
+
+  async function syncGroupSortOrderToServer(catalogId, ids) {
+      const normalizedCatalogId = String(catalogId || '').trim();
+      if (!normalizedCatalogId || !ids.length) return false;
+      try {
+          const res = await fetch('/api/bookmark-order', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                  catalogId: normalizedCatalogId,
+                  ids
+              })
+          });
+          if (!res.ok) return false;
+          const data = await res.json().catch(() => null);
+          return Number(data?.code) === 200;
+      } catch (error) {
+          console.error('Failed to sync bookmark sort order:', error);
+          return false;
+      }
+  }
+
   function saveGroupSortOrder(groupName, groupGrid, catalogId = '') {
       if (!groupGrid) return;
-      const ids = Array.from(groupGrid.querySelectorAll('.site-card'))
-          .map(card => card.getAttribute('data-id'))
-          .filter(Boolean);
-      localStorage.setItem(getGroupStorageKey(groupName, catalogId), JSON.stringify(ids));
+      const ids = collectGroupCardIds(groupGrid);
+      if (!ids.length) return;
+      const normalizedCatalogId = String(catalogId || '').trim();
+
+      if (!useServerBookmarkSortSync || !normalizedCatalogId) {
+          localStorage.setItem(getGroupStorageKey(groupName, normalizedCatalogId), JSON.stringify(ids));
+          return;
+      }
+
+      enqueueGroupSortSave(groupName, normalizedCatalogId, async () => {
+          const synced = await syncGroupSortOrderToServer(normalizedCatalogId, ids);
+          if (synced) {
+              localStorage.removeItem(getGroupStorageKey(groupName, normalizedCatalogId));
+              return;
+          }
+          showToast('Sort sync failed. Please sign in to admin and retry.');
+      });
   }
 
   function getGroupGridClass(gridCols) {
@@ -1215,63 +1295,4 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   }
 
-  // ========== Random Wallpaper Logic (Client-side) ==========
-  runWhenIdle(async () => {
-      const config = window.IORI_LAYOUT_CONFIG || {};
-      if (!config.randomWallpaper) return;
-
-      const bgContainer = document.getElementById('fixed-background');
-      if (!bgContainer) return;
-
-      const img = bgContainer.querySelector('img');
-      // Get current index from cookie
-      const match = document.cookie.match(/wallpaper_index=(\d+)/);
-      const currentIndex = match ? parseInt(match[1]) : -1;
-
-      try {
-          const params = new URLSearchParams({
-              source: config.wallpaperSource || 'bing',
-              cid: config.wallpaperCid360 || '36',
-              country: config.bingCountry || '',
-              index: currentIndex
-          });
-
-          const res = await fetch(`/api/wallpaper?${params.toString()}`);
-          if (res.ok) {
-              const data = await res.json();
-              if (data.code === 200 && data.data && data.data.url) {
-                  const newUrl = data.data.url;
-                  const newIndex = data.data.index;
-
-                  // Preload image
-                  const newImg = new Image();
-                  newImg.src = newUrl;
-                  newImg.onload = () => {
-                      if (img) {
-                          img.classList.add('wallpaper-image');
-                          img.style.transition = 'opacity 0.5s ease-in-out';
-                          img.style.opacity = '0';
-                          setTimeout(() => {
-                              img.src = newUrl;
-                              img.style.opacity = '1';
-                          }, 500);
-                      } else {
-                          // If no img tag exists (e.g. initial solid color), create one
-                          const blurValue = config.enableBgBlur ? Number(config.bgBlurIntensity) || 0 : 0;
-                          const blurStyle = blurValue > 0 ? `filter: blur(${blurValue}px); transform: scale(1.02);` : 'transform: scale(1);';
-                          bgContainer.innerHTML = `<img class="wallpaper-image" src="${newUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; object-position: center center; ${blurStyle} opacity: 0; transition: opacity 0.5s ease-in-out;" />`;
-                          setTimeout(() => {
-                              bgContainer.querySelector('img').style.opacity = '1';
-                          }, 50);
-                      }
-                      
-                      // Update cookie for next rotation
-                      document.cookie = `wallpaper_index=${newIndex}; path=/; max-age=31536000; SameSite=Lax`;
-                  };
-              }
-          }
-      } catch (e) {
-          console.error('Failed to fetch random wallpaper:', e);
-      }
-  }, 1200);
 });
