@@ -122,6 +122,27 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   setupViewportStability();
+
+  // Wallpapers are purely decorative. Deferring them keeps a multi-megabyte remote image
+  // from competing with the initial HTML, CSS, and visible bookmarks.
+  function deferWallpaperLoad() {
+    const wallpaper = document.querySelector('#fixed-background img[data-src]');
+    const src = wallpaper?.dataset.src;
+    if (!wallpaper || !src) return;
+
+    const load = () => {
+      wallpaper.src = src;
+      wallpaper.removeAttribute('data-src');
+    };
+
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(load, { timeout: 1500 });
+    } else {
+      window.setTimeout(load, 700);
+    }
+  }
+
+  deferWallpaperLoad();
   
   function closeSidebarMenu() {
     // Unified layout no longer uses mobile sidebar navigation.

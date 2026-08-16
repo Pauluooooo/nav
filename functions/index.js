@@ -1,6 +1,6 @@
 // functions/index.js
 import { isAdminAuthenticated } from './_middleware';
-import { FONT_MAP, SCHEMA_VERSION } from './constants';
+import { FONT_MAP } from './constants';
 
 // Helper utilities
 function escapeHTML(str) {
@@ -36,85 +36,25 @@ function normalizeSortOrder(val) {
   return Number.isFinite(num) ? num : 9999;
 }
 
-// In-memory schema migration flag to avoid repeated KV reads on warm instances.
-let schemaMigrated = false;
-
-async function ensureSchema(env) {
-  // Warm instance fast-path.
-  if (schemaMigrated) return;
-
-  // Cold start: check persisted migration state in KV.
-  const migrated = await env.NAV_AUTH.get(`schema_migrated_${SCHEMA_VERSION}`);
-  if (migrated) {
-    schemaMigrated = true;
-    return;
-  }
-
-  try {
-    // Create required indexes in a single batch.
-    await env.NAV_DB.batch([
-      env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_catelog_id ON sites(catelog_id)"),
-      env.NAV_DB.prepare("CREATE INDEX IF NOT EXISTS idx_sites_sort_order ON sites(sort_order)")
-    ]);
-
-    // Inspect schema and add missing columns.
-    const sitesColumns = await env.NAV_DB.prepare("PRAGMA table_info(sites)").all();
-    const sitesCols = new Set(sitesColumns.results.map(c => c.name));
-    
-    const categoryColumns = await env.NAV_DB.prepare("PRAGMA table_info(category)").all();
-    const categoryCols = new Set(categoryColumns.results.map(c => c.name));
-    
-    const pendingColumns = await env.NAV_DB.prepare("PRAGMA table_info(pending_sites)").all();
-    const pendingCols = new Set(pendingColumns.results.map(c => c.name));
-
-    const alterStatements = [];
-    
-    if (!sitesCols.has('is_private')) {
-      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE sites ADD COLUMN is_private INTEGER DEFAULT 0"));
-    }
-    if (!sitesCols.has('catelog_name')) {
-      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE sites ADD COLUMN catelog_name TEXT"));
-    }
-    if (!pendingCols.has('catelog_name')) {
-      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE pending_sites ADD COLUMN catelog_name TEXT"));
-    }
-    if (!categoryCols.has('is_private')) {
-      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE category ADD COLUMN is_private INTEGER DEFAULT 0"));
-    }
-    if (!categoryCols.has('parent_id')) {
-      alterStatements.push(env.NAV_DB.prepare("ALTER TABLE category ADD COLUMN parent_id INTEGER DEFAULT 0"));
-    }
-
-    if (alterStatements.length > 0) {
-      // SQLite does not support batched ALTER statements.
-      for (const stmt of alterStatements) {
-        try { await stmt.run(); } catch (e) { console.log('Column may already exist:', e.message); }
-      }
-      
-      // Backfill catelog_name once after the column is added.
-      if (!sitesCols.has('catelog_name')) {
-        await env.NAV_DB.prepare(`
-          UPDATE sites 
-          SET catelog_name = (SELECT catelog FROM category WHERE category.id = sites.catelog_id) 
-          WHERE catelog_name IS NULL
-        `).run();
-      }
-    }
-
-    // Persist migration completion and update in-memory flag.
-    await env.NAV_AUTH.put(`schema_migrated_${SCHEMA_VERSION}`, 'true');
-    schemaMigrated = true;
-    console.log('Schema migration completed');
-  } catch (e) {
-    console.error('Schema migration failed:', e);
-  }
+function homeResponseHeaders(isAuthenticated, cacheState) {
+  return {
+    'Content-Type': 'text/html; charset=utf-8',
+    // Private pages can contain private bookmarks, so they must never enter any browser/shared cache.
+    // Public pages may be reused by the browser briefly; `Vary: Cookie` keeps that cache separate
+    // from an authenticated navigation after login.
+    'Cache-Control': isAuthenticated
+      ? 'private, no-store'
+      : 'public, max-age=60, must-revalidate',
+    'Vary': 'Cookie',
+    'X-Cache': cacheState
+  };
 }
 
 export async function onRequest(context) {
   const { request, env } = context;
   
-  // Ensure schema migration is applied (KV + memory guarded).
-  await ensureSchema(env);
+  // Schema initialization is performed once by the global Pages middleware.
+  // Do not repeat its KV readiness check here: public cache hits are latency-sensitive.
 
   const isAuthenticated = await isAdminAuthenticated(request, env);
   const includePrivate = isAuthenticated ? 1 : 0;
@@ -149,10 +89,7 @@ export async function onRequest(context) {
           const cachedHtml = await env.NAV_AUTH.get(cacheKey);
           if (cachedHtml) {
             return new Response(cachedHtml, {
-              headers: { 
-                'Content-Type': 'text/html; charset=utf-8',
-                'X-Cache': 'HIT'
-              }
+              headers: homeResponseHeaders(isAuthenticated, 'HIT')
             });
           }
         } catch (e) {
@@ -957,8 +894,8 @@ export async function onRequest(context) {
       // Slight scale avoids visible white edges after blur.
       
       bgLayerHtml = `
-        <div id="fixed-background" style="position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;">
-          <img src="${safeWallpaperUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover; object-position: center center; ${blurStyle}" />
+        <div id="fixed-background" style="position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background-color: ${defaultBgColor};">
+          <img data-src="${safeWallpaperUrl}" alt="" aria-hidden="true" decoding="async" fetchpriority="low" style="width: 100%; height: 100%; object-fit: cover; object-position: center center; ${blurStyle}" />
         </div>
       `;
   } else {
@@ -1144,7 +1081,7 @@ export async function onRequest(context) {
     .replace('{{SIDEBAR_TOGGLE_CLASS}}', sidebarToggleClass);
 
   const response = new Response(html, {
-    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+    headers: homeResponseHeaders(isAuthenticated, 'MISS')
   });
 
   if (shouldClearCookie) {
