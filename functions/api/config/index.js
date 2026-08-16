@@ -109,7 +109,7 @@ export async function onRequestPost(context) {
   try {
     const config = await request.json();
     const { name, url, logo, desc, catelogId, sort_order, is_private } = config;
-    const iconAPI=env.ICON_API ||'https://faviconsnap.com/api/favicon?url=';
+    const iconAPI=env.ICON_API || new URL('/api/icon?url=', request.url).href;
     
     const sanitizedName = (name || '').trim();
     const sanitizedUrl = (url || '').trim();

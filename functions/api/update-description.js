@@ -16,7 +16,7 @@ export async function onRequestPost(context) {
     if (!id || typeof description !== 'string') {
       return errorResponse('Bookmark ID and description are required', 400);
     }
-    const iconAPI=env.ICON_API ||'https://faviconsnap.com/api/favicon?url=';
+    const iconAPI=env.ICON_API || new URL('/api/icon?url=', request.url).href;
     let sanitizedLogo = (logo || '').trim() || null;
     if(!logo && url){
       if(url.startsWith('https://') || url.startsWith('http://')){

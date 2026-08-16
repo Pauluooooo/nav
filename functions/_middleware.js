@@ -105,6 +105,11 @@ async function initializeDb(db, kv) {
 
 // 导出中间件(可选,用于添加全局逻辑)
 export async function onRequest(context) {
+  // Icon responses are served from the edge cache and never need D1/KV initialization.
+  if (new URL(context.request.url).pathname === '/api/icon') {
+    return context.next();
+  }
+
   // 在每个请求开始时检查并初始化数据库
   if (context.env.NAV_DB) {
     await initializeDb(context.env.NAV_DB, context.env.NAV_AUTH);

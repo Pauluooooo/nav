@@ -36,6 +36,23 @@ function normalizeSortOrder(val) {
   return Number.isFinite(num) ? num : 9999;
 }
 
+function localIconUrl(logo, requestUrl) {
+  if (!logo) return logo;
+  try {
+    const parsed = new URL(String(logo));
+    const isLegacyFavicon = parsed.hostname.toLowerCase() === 'faviconsnap.com'
+      && parsed.pathname === '/api/favicon';
+    const target = parsed.searchParams.get('url');
+    if (!isLegacyFavicon || !target) return logo;
+
+    const proxy = new URL('/api/icon', requestUrl);
+    proxy.searchParams.set('url', target);
+    return proxy.href;
+  } catch {
+    return logo;
+  }
+}
+
 function homeResponseHeaders(isAuthenticated, cacheState) {
   return {
     'Content-Type': 'text/html; charset=utf-8',
@@ -292,7 +309,10 @@ export async function onRequest(context) {
   homeThemeAutoDarkEnd = normalizeThemeHour(homeThemeAutoDarkEnd, 7);
 
   // Process site records.
-  let allSites = sitesResult.results || [];
+  let allSites = (sitesResult.results || []).map((site) => ({
+    ...site,
+    logo: localIconUrl(site.logo, request.url)
+  }));
   if (sitesResult.error) {
     return new Response(`Failed to fetch sites: ${sitesResult.error.message}`, { status: 500 });
   }

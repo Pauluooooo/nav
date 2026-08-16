@@ -211,7 +211,7 @@ export async function onRequestPost(context) {
     let itemsAdded = 0;
     let itemsUpdated = 0;
     let itemsSkipped = 0;
-    const iconAPI = env.ICON_API || 'https://faviconsnap.com/api/favicon?url=';
+    const iconAPI = env.ICON_API || new URL('/api/icon?url=', request.url).href;
 
     for (const site of sitesToImport) {
         const sanitizedUrl = (site.url || '').trim();
